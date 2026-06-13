@@ -659,6 +659,8 @@ def test_nav_i18n_keeps_native_tag_editor_entry_distinct():
     assert "function ensureTagEditorLinks()" in script
     assert "经典标签编辑" in script
     assert "原生标签编辑" in script
+    assert '灯泡: "Theme"' in script
+    assert 'document.querySelector(".sidebar-bottom")' in script
     assert "textNodes.slice(1).forEach" in script
     assert 'native.href = "/native-tageditor.html"' in script
     assert "ensureTagEditorLinks();" in script

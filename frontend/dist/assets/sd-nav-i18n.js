@@ -26,6 +26,7 @@
     更新日志: "Changelog",
     终端: "Terminal",
     训练终端: "Training Terminal",
+    灯泡: "Theme",
     全部: "All",
     部署: "Deploy",
     系统: "System",
@@ -865,6 +866,9 @@
     ensureTagEditorLinks();
     const sidebar = document.querySelector(".sidebar .sidebar-items");
     if (sidebar) replaceInElement(sidebar, map);
+
+    const sidebarBottom = document.querySelector(".sidebar-bottom");
+    if (sidebarBottom) replaceInElement(sidebarBottom, map);
 
     const hub = document.querySelector(".sd-home-hub");
     if (hub) replaceInElement(hub, map);
