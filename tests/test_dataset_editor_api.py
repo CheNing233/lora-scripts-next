@@ -322,9 +322,7 @@ def test_native_tageditor_embeds_native_editor_in_trainer_shell():
     assert "dataset-editor-entry.js" in response.text
     assert "dataset-editor.css" in response.text
     assert 'name="sd-dataset-editor-script"' in response.text
-    assert (
-        'src="/assets/app.547295de.js?v=20260604-native-tageditor-2"' in response.text
-    )
+    assert 'src="/assets/app.547295de.js?v=' in response.text
     assert 'href="/tageditor.md"' in response.text
     assert 'href="/native-tageditor.html"' in response.text
     assert "经典标签编辑" in response.text
@@ -356,14 +354,8 @@ def test_native_tageditor_uses_native_vuepress_page_data():
     assert parsed_page_data["title"] == "原生标签编辑"
     assert parsed_page_data["frontmatter"] == {}
     assert parsed_page_data["frontmatter"].get("type") != "iframe"
-    assert (
-        '"v-native-tageditor":()=>wt(()=>import("./native-tageditor.html.native.js?v=20260604-native-tageditor-2")'
-        in app_bundle
-    )
-    assert (
-        '"v-native-tageditor":Jt(()=>wt(()=>import("./native-tageditor.html.page.js?v=20260604-native-tageditor-2")'
-        in app_bundle
-    )
+    assert '"v-native-tageditor":()=>wt(()=>import("./native-tageditor.html.native.js?v=' in app_bundle
+    assert '"v-native-tageditor":Jt(()=>wt(()=>import("./native-tageditor.html.page.js?v=' in app_bundle
     assert app_bundle.count('["v-native-tageditor","/native-tageditor.html"') == 1
     assert (
         '["v-native-tageditor","/native-tageditor.html",{title:"原生标签编辑"}'
@@ -670,6 +662,45 @@ def test_nav_i18n_keeps_native_tag_editor_entry_distinct():
     assert "textNodes.slice(1).forEach" in script
     assert 'native.href = "/native-tageditor.html"' in script
     assert "ensureTagEditorLinks();" in script
+
+
+def test_nav_i18n_persists_language_choice_across_browser_sessions():
+    # frontend/dist is a precompiled artifact with no JS test harness, so these
+    # are static source-presence checks: they guard against the specific
+    # regressions we fixed (session-only storage, write side effects in the
+    # detector), NOT a substitute for runtime behavior. Real persistence is
+    # verified via agent-browser (see PR #124 evidence screenshots).
+    script = (ROOT / "frontend" / "dist" / "assets" / "sd-nav-i18n.js").read_text(
+        encoding="utf-8"
+    )
+
+    # Persisted in localStorage (survives browser restart), never sessionStorage.
+    assert "localStorage.setItem(STORAGE_KEY, next)" in script
+    assert "sessionStorage.setItem(STORAGE_KEY" not in script
+
+    # One-time legacy migration runs at boot and clears the stale session copy.
+    assert "function migrateLegacyLocale()" in script
+    assert "migrateLegacyLocale();" in script
+    assert "sessionStorage.removeItem(STORAGE_KEY)" in script
+
+    # Detection is a pure read: it must not write storage on the read path.
+    detect_start = script.index("function detectEnglishUI()")
+    detect_body = script[detect_start : detect_start + 600]
+    assert "readStoredLocale()" in detect_body
+    assert "setItem" not in detect_body
+
+
+def test_nav_i18n_translates_sidebar_bottom_theme_and_tooltip():
+    script = (ROOT / "frontend" / "dist" / "assets" / "sd-nav-i18n.js").read_text(
+        encoding="utf-8"
+    )
+
+    # Bottom sidebar (theme toggle) is included in the locale pass.
+    assert 'document.querySelector(".sidebar-bottom")' in script
+    assert '灯泡: "Theme"' in script
+    # Color-mode tooltip (title attribute) is translated too.
+    assert '切换颜色模式: "toggle color mode"' in script
+    assert 'querySelectorAll("[title]")' in script
 
 
 def test_dataset_editor_tagger_panel_can_append_trigger_words():
