@@ -443,12 +443,12 @@ def test_embedded_dataset_editor_pager_wraps_before_buttons_overflow():
     assert "justify-content: flex-start;" in pager_breakpoint
 
 
-def test_legacy_gradio_tageditor_is_opt_in():
+def test_legacy_gradio_tageditor_starts_by_default_for_existing_users():
     gui = (ROOT / "gui.py").read_text(encoding="utf-8")
 
     assert "--enable-legacy-tageditor" in gui
-    assert "legacy_tageditor_enabled = args.enable_legacy_tageditor" in gui
-    assert "Using native dataset editor at /dataset-editor.html" in gui
+    assert "legacy_tageditor_enabled = not args.disable_tageditor" in gui
+    assert "run_tag_editor(tageditor_port)" in gui
 
 
 def test_dataset_editor_frontend_exposes_edit_efficiency_controls():
