@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 import re
 from typing import Any
@@ -81,6 +82,11 @@ FAST_SUPPORTED_OPTIMIZERS = {
     "Prodigy",
     "pytorch_optimizer.CAME",
 }
+
+FAST_CACHE_PAIRS = (
+    ("cache_latents", "cache_latents_to_disk"),
+    ("cache_text_encoder_outputs", "cache_text_encoder_outputs_to_disk"),
+)
 
 
 @dataclass
@@ -312,9 +318,17 @@ def adapt_config(source: dict[str, Any], runtime: RuntimeConfig, run_id: str) ->
                 f"static_token_count 已按 resolution 自动提高到 {tokens}；"
                 "高分辨率 Fast compile 会显著增加显存占用"
             )
-    cache_keys = ("cache_latents", "cache_text_encoder_outputs")
+    for cache_key, disk_key in FAST_CACHE_PAIRS:
+        values.setdefault(cache_key, False)
+        if not truthy(values.get(cache_key)):
+            values[disk_key] = False
+        else:
+            values.setdefault(disk_key, True)
+    values.setdefault("skip_cache_check", False)
+
+    cache_keys = tuple(cache_key for cache_key, _disk_key in FAST_CACHE_PAIRS)
     if truthy(values.get("skip_cache_check")) and any(truthy(values.get(key)) for key in cache_keys):
-        for key in (*cache_keys, "skip_cache_check"):
+        for key in (*cache_keys, *(disk_key for _cache_key, disk_key in FAST_CACHE_PAIRS), "skip_cache_check"):
             values[key] = False
         warnings.append(
             "cache_latents/cache_text_encoder_outputs 不能与 skip_cache_check 同时开启；"
@@ -325,6 +339,8 @@ def adapt_config(source: dict[str, Any], runtime: RuntimeConfig, run_id: str) ->
         values["compile_mode"] = "blocks"
         warnings.append("compile_mode=full 与 gradient_checkpointing 不兼容，已自动改为 blocks")
     values.setdefault("dynamo_backend", "inductor")
+    values.setdefault("log_prefix", "af_")
+    values.setdefault("log_tracker_name", "tb")
     if is_empty(values.get("attn_mode")):
         values["attn_mode"] = "torch"
         warnings.append("attn_mode 留空时使用 torch 保底；如需 flash 请先确认插件环境已安装 flash-attn")
@@ -368,3 +384,23 @@ def toml_scalar(value: Any) -> str:
 
 def dump_flat_toml(values: dict[str, Any]) -> str:
     return "".join(f"{key} = {toml_scalar(value)}\n" for key, value in values.items())
+
+
+def ensure_fast_run_log_dirs(values: dict[str, Any], now: datetime | None = None) -> list[Path]:
+    logging_dir = values.get("logging_dir")
+    if is_empty(logging_dir):
+        return []
+    root = Path(str(logging_dir))
+    root.mkdir(parents=True, exist_ok=True)
+
+    created = [root]
+    current = now or datetime.now()
+    parts = [p for p in (values.get("method"), values.get("preset", "default")) if not is_empty(p)]
+    log_prefix = ("_".join(str(p) for p in parts) + "_") if parts else ""
+    tracker_name = str(values.get("log_tracker_name") or "network_train")
+    for offset in range(3):
+        run_dir = root / f"{log_prefix}{(current + timedelta(minutes=offset)).strftime('%Y%m%d-%H%M')}"
+        tracker_dir = run_dir / tracker_name
+        tracker_dir.mkdir(parents=True, exist_ok=True)
+        created.append(tracker_dir)
+    return created
