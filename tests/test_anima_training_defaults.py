@@ -32,6 +32,7 @@ class AnimaTrainingDefaultsTests(unittest.TestCase):
         apply_anima_training_defaults(config, "anima-lora")
 
         self.assertTrue(config.get("full_bf16"))
+        self.assertIn("Enabled full_bf16 for Anima LoKr", config["_training_warnings"][0])
 
     def test_anima_lokr_full_matrix_uses_conservative_guardrails(self):
         config = {
@@ -48,6 +49,7 @@ class AnimaTrainingDefaultsTests(unittest.TestCase):
 
         self.assertNotIn("full_bf16", config)
         self.assertEqual(config["scale_weight_norms"], 1)
+        self.assertIn("full_matrix=true", config["_training_warnings"][0])
 
     def test_anima_disables_full_bf16_for_came(self):
         config = {
@@ -62,6 +64,28 @@ class AnimaTrainingDefaultsTests(unittest.TestCase):
 
         self.assertNotIn("full_bf16", config)
         self.assertEqual(config["unet_lr"], 2e-5)
+        self.assertIn("pytorch_optimizer.CAME", config["_training_warnings"][0])
+
+    def test_anima_came_lokr_full_matrix_keeps_scale_weight_guardrail(self):
+        config = {
+            "mixed_precision": "fp16",
+            "full_fp16": True,
+            "optimizer_type": "pytorch_optimizer.CAME",
+            "network_module": "lycoris.kohya",
+            "network_args": ["algo=lokr", "full_matrix=True"],
+            "unet_lr": "2e-5",
+            "attn_mode": "torch",
+        }
+
+        with mock.patch("mikazuki.app.api._cuda_bf16_supported", return_value=True):
+            apply_anima_training_defaults(config, "anima-lora")
+
+        self.assertEqual(config["mixed_precision"], "bf16")
+        self.assertNotIn("full_fp16", config)
+        self.assertEqual(config["scale_weight_norms"], 1)
+        self.assertTrue(
+            any("full_matrix=true" in warning for warning in config["_training_warnings"])
+        )
 
     def test_anima_disables_full_bf16_for_automagic(self):
         config = {
@@ -91,6 +115,7 @@ class AnimaTrainingDefaultsTests(unittest.TestCase):
 
         self.assertEqual(config["mixed_precision"], "bf16")
         self.assertNotIn("full_fp16", config)
+        self.assertIn("Changed Anima mixed_precision", config["_training_warnings"][0])
 
     def test_anima_keeps_fp16_when_bf16_is_not_supported(self):
         config = {

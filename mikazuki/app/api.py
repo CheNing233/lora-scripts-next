@@ -113,6 +113,12 @@ trainer_mapping = {
 }
 
 
+def _add_training_warning(config: dict, message: str) -> None:
+    warnings = config.setdefault("_training_warnings", [])
+    if isinstance(warnings, list) and message not in warnings:
+        warnings.append(message)
+
+
 def _normalize_kv_arg_list(values) -> list[str]:
     """Normalize key=value style arg list from UI payload."""
     if not isinstance(values, list):
@@ -412,6 +418,11 @@ def apply_anima_training_defaults(config: dict, model_train_type: str):
     if optimizer_type in ANIMA_FULL_PRECISION_UNSAFE_OPTIMIZERS:
         if config.get("mixed_precision") == "fp16" and _cuda_bf16_supported():
             config["mixed_precision"] = "bf16"
+            _add_training_warning(
+                config,
+                "Changed Anima mixed_precision from fp16 to bf16 for optimizer "
+                f"{config.get('optimizer_type')}. fp16 is more likely to produce loss=nan.",
+            )
             log.warning(
                 "Changed Anima mixed_precision from fp16 to bf16 for optimizer "
                 f"{config.get('optimizer_type')}. fp16 is more likely to produce loss=nan."
@@ -422,11 +433,34 @@ def apply_anima_training_defaults(config: dict, model_train_type: str):
             if config.pop(key, None):
                 disabled.append(key)
         if disabled:
+            _add_training_warning(
+                config,
+                "Disabled Anima full half-precision training for optimizer "
+                f"{config.get('optimizer_type')} ({', '.join(disabled)}). "
+                "This keeps trainable LoRA weights in fp32 to reduce loss=nan risk.",
+            )
             log.warning(
                 "Disabled Anima full half-precision training for optimizer "
                 f"{config.get('optimizer_type')} ({', '.join(disabled)}). "
                 "This keeps trainable LoRA weights in fp32 to reduce loss=nan risk."
             )
+        if _anima_lokr_full_matrix_training(config):
+            had_scale_guardrail = not _is_invalid_value(config.get("scale_weight_norms"))
+            if _is_invalid_value(config.get("scale_weight_norms")):
+                config["scale_weight_norms"] = 1
+            if disabled or not had_scale_guardrail:
+                _add_training_warning(
+                    config,
+                    "Anima LoKr full_matrix=true uses conservative stability guardrails: "
+                    "trainable adapter weights stay fp32 and scale_weight_norms defaults to 1. "
+                    f"Disabled full half precision: {', '.join(disabled) if disabled else 'none'}",
+                )
+                log.warning(
+                    "Anima LoKr full_matrix=true uses conservative stability guardrails: "
+                    "trainable adapter weights stay fp32 and scale_weight_norms defaults to 1. "
+                    "Disabled full half precision: %s",
+                    ", ".join(disabled) if disabled else "none",
+                )
     elif _anima_lokr_full_matrix_training(config):
         disabled = []
         for key in ("full_bf16", "full_fp16"):
@@ -434,6 +468,12 @@ def apply_anima_training_defaults(config: dict, model_train_type: str):
                 disabled.append(key)
         if _is_invalid_value(config.get("scale_weight_norms")):
             config["scale_weight_norms"] = 1
+        _add_training_warning(
+            config,
+            "Anima LoKr full_matrix=true uses conservative stability guardrails: "
+            "trainable adapter weights stay fp32 and scale_weight_norms defaults to 1. "
+            f"Disabled full half precision: {', '.join(disabled) if disabled else 'none'}",
+        )
         log.warning(
             "Anima LoKr full_matrix=true uses conservative stability guardrails: "
             "trainable adapter weights stay fp32 and scale_weight_norms defaults to 1. "
@@ -447,6 +487,11 @@ def apply_anima_training_defaults(config: dict, model_train_type: str):
         full_key = "full_bf16" if mixed == "bf16" else "full_fp16" if mixed == "fp16" else None
         if full_key and not config.get(full_key):
             config[full_key] = True
+            _add_training_warning(
+                config,
+                f"Enabled {full_key} for Anima LoKr mixed_precision={mixed} to keep "
+                "adapter and activation dtypes aligned.",
+            )
             log.info(
                 "Enabled %s for Anima LoKr mixed_precision=%s to keep adapter and "
                 "activation dtypes aligned.",
