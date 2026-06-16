@@ -113,6 +113,13 @@ trainer_mapping = {
 }
 
 
+def _missing_standard_train_field(field: str, label: str) -> APIResponseFail:
+    return APIResponseFail(
+        message=f"缺少 {label} ({field})，无法启动训练。请检查训练参数后重试。",
+        data={"field": field},
+    )
+
+
 def _normalize_kv_arg_list(values) -> list[str]:
     """Normalize key=value style arg list from UI payload."""
     if not isinstance(values, list):
@@ -612,16 +619,32 @@ async def create_toml_file(request: Request):
             log.error(f"Anima Fast launch failed: {exc}")
             return APIResponseFail(message=f"Anima Fast launch failed: {exc}")
 
-    suggest_cpu_threads = 8 if len(train_utils.get_total_images(config["train_data_dir"], limit=200)) >= 200 else 2
+    if model_train_type not in trainer_mapping:
+        return APIResponseFail(
+            message=f"不支持的训练类型: {model_train_type}",
+            data={"model_train_type": model_train_type},
+        )
+
+    train_data_dir = str(config.get("train_data_dir") or "").strip()
+    if not train_data_dir:
+        return _missing_standard_train_field("train_data_dir", "训练数据集路径")
+    config["train_data_dir"] = train_data_dir
+
+    pretrained_model = str(config.get("pretrained_model_name_or_path") or "").strip()
+    if not pretrained_model:
+        return _missing_standard_train_field("pretrained_model_name_or_path", "底模路径")
+    config["pretrained_model_name_or_path"] = pretrained_model
+
+    suggest_cpu_threads = 8 if len(train_utils.get_total_images(train_data_dir, limit=200)) >= 200 else 2
     trainer_file = trainer_mapping[model_train_type]
     apply_sdxl_prediction_type(config, model_train_type)
     apply_anima_training_defaults(config, model_train_type)
 
     if model_train_type != "sdxl-finetune":
-        if not train_utils.validate_data_dir(config["train_data_dir"]):
+        if not train_utils.validate_data_dir(train_data_dir):
             return APIResponseFail(message="训练数据集路径不存在或没有图片，请检查目录。")
 
-    validated, message = train_utils.validate_model(config["pretrained_model_name_or_path"], model_train_type)
+    validated, message = train_utils.validate_model(pretrained_model, model_train_type)
     if not validated:
         return APIResponseFail(message=message)
 
