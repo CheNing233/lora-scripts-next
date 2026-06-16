@@ -244,6 +244,15 @@ def _normalize_network_args(values: Any) -> list[str]:
     return ordered
 
 
+def _apply_lr_fallback(source: dict[str, Any]) -> None:
+    learning_rate = source.get("learning_rate")
+    if _is_empty_value(learning_rate):
+        return
+    for key in ("unet_lr", "text_encoder_lr"):
+        if _is_empty_value(source.get(key)):
+            source[key] = learning_rate
+
+
 def adapt_anima_config(
     config: dict[str, Any], *, finetune: bool = False
 ) -> tuple[dict[str, Any], list[str]]:
@@ -270,6 +279,8 @@ def adapt_anima_config(
             source["network_args"] = normalized_network_args
         elif "network_args" in source:
             source.pop("network_args", None)
+
+        _apply_lr_fallback(source)
 
     # LyCORIS default preset does not include Anima module class names, which may
     # produce zero trainable modules for LoKr. Inject Anima-specific preset unless

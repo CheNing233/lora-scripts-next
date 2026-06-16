@@ -194,6 +194,36 @@ class AnimaBackendAdapterTests(unittest.TestCase):
         self.assertIn("dropout=0", na)
         self.assertIn("module_dropout=0.0", na)
 
+    def test_learning_rate_fills_missing_component_lrs(self):
+        config = {
+            "network_module": "lycoris.kohya",
+            "lycoris_algo": "lokr",
+            "network_train_unet_only": True,
+            "learning_rate": "1",
+            "unet_lr": "",
+            "text_encoder_lr": "",
+        }
+        adapted, warnings = adapt_anima_config(config)
+
+        self.assertEqual(adapted["learning_rate"], "1")
+        self.assertEqual(adapted["unet_lr"], "1")
+        self.assertEqual(adapted["text_encoder_lr"], "1")
+        self.assertEqual(warnings, [])
+
+    def test_learning_rate_does_not_override_component_lrs(self):
+        config = {
+            "network_module": "lycoris.kohya",
+            "lycoris_algo": "lokr",
+            "learning_rate": "1",
+            "unet_lr": "5e-5",
+            "text_encoder_lr": "1e-5",
+        }
+        adapted, warnings = adapt_anima_config(config)
+
+        self.assertEqual(adapted["unet_lr"], "5e-5")
+        self.assertEqual(adapted["text_encoder_lr"], "1e-5")
+        self.assertEqual(warnings, [])
+
 
 if __name__ == "__main__":
     unittest.main()
