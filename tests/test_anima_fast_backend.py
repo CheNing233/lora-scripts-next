@@ -11,6 +11,7 @@ from mikazuki.anima_fast_backend.adapter import (
     adapt_config,
     dataset_cache_slug,
     dump_flat_toml,
+    ensure_fast_run_log_dirs,
 )
 from mikazuki.anima_fast_backend.extension_state import (
     STATE_INSTALLED_UNVERIFIED,
@@ -249,6 +250,50 @@ class AdapterTests(unittest.TestCase):
         self.assertNotIn("unsloth_offload_checkpointing", adapted.values)
         self.assertTrue(any("blocks_to_swap" in warning for warning in adapted.warnings))
 
+    def test_adapt_config_forces_live_encoding_cache_overrides(self):
+        with tempfile.TemporaryDirectory() as td:
+            runtime = make_runtime(Path(td))
+            adapted = adapt_config({
+                "lora_type": "lora",
+                "cache_latents": False,
+                "cache_latents_to_disk": True,
+                "cache_text_encoder_outputs": False,
+                "cache_text_encoder_outputs_to_disk": True,
+            }, runtime, "run-1")
+
+        self.assertFalse(adapted.values["cache_latents"])
+        self.assertFalse(adapted.values["cache_latents_to_disk"])
+        self.assertFalse(adapted.values["cache_text_encoder_outputs"])
+        self.assertFalse(adapted.values["cache_text_encoder_outputs_to_disk"])
+        toml_text = dump_flat_toml(adapted.values)
+        self.assertIn("cache_latents_to_disk = false", toml_text)
+        self.assertIn("cache_text_encoder_outputs_to_disk = false", toml_text)
+
+    def test_adapt_config_uses_short_fast_log_defaults(self):
+        with tempfile.TemporaryDirectory() as td:
+            runtime = make_runtime(Path(td))
+            adapted = adapt_config({
+                "lora_type": "lora",
+            }, runtime, "run-1")
+
+        self.assertEqual(adapted.values["log_prefix"], "af_")
+        self.assertEqual(adapted.values["log_tracker_name"], "tb")
+
+    def test_ensure_fast_run_log_dirs_creates_tracker_dirs(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            values = {
+                "logging_dir": str(root / "logs" / "anima_fast"),
+                "method": "lora",
+                "log_tracker_name": "network_train",
+            }
+
+            created = ensure_fast_run_log_dirs(values, now=None)
+
+            self.assertTrue((root / "logs" / "anima_fast").is_dir())
+            self.assertGreaterEqual(len(created), 4)
+            self.assertTrue(any(path.name == "network_train" for path in created))
+
     def test_adapt_config_disables_cache_when_skip_cache_check_is_combined(self):
         with tempfile.TemporaryDirectory() as td:
             runtime = make_runtime(Path(td))
@@ -260,7 +305,9 @@ class AdapterTests(unittest.TestCase):
             }, runtime, "run-1")
 
         self.assertFalse(adapted.values["cache_latents"])
+        self.assertFalse(adapted.values["cache_latents_to_disk"])
         self.assertFalse(adapted.values["cache_text_encoder_outputs"])
+        self.assertFalse(adapted.values["cache_text_encoder_outputs_to_disk"])
         self.assertFalse(adapted.values["skip_cache_check"])
         self.assertTrue(any("skip_cache_check" in warning for warning in adapted.warnings))
 

@@ -34,7 +34,12 @@ from fastapi.responses import StreamingResponse
 import mikazuki.process as process
 from mikazuki import launch_utils
 from mikazuki.anima_fast_backend import TRAIN_TYPE as ANIMA_FAST_TRAIN_TYPE
-from mikazuki.anima_fast_backend.adapter import AdapterError, adapt_config, dump_flat_toml
+from mikazuki.anima_fast_backend.adapter import (
+    AdapterError,
+    adapt_config,
+    dump_flat_toml,
+    ensure_fast_run_log_dirs,
+)
 from mikazuki.anima_fast_backend.extension_state import (
     STATE_INSTALLED_UNVERIFIED,
     STATE_READY,
@@ -558,6 +563,7 @@ def _write_anima_fast_toml(config: dict, timestamp: str, autosave_dir: str) -> t
 
 def _write_adapted_anima_fast_toml(values: dict, warnings: list[str], run_id: str, autosave_dir: str) -> tuple[Path, dict, list[str]]:
     toml_file = Path(autosave_dir) / f"{run_id}.toml"
+    ensure_fast_run_log_dirs(values)
     toml_file.write_text(dump_flat_toml(values), encoding="utf-8")
     return toml_file, values, warnings
 
