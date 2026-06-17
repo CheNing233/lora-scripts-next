@@ -317,7 +317,15 @@ def apply_sdxl_prediction_type(config: dict, model_train_type: str):
 
 
 def is_preview_enabled(config: dict) -> bool:
-    return config.get("enable_preview") in (True, "true", "True", "1", 1)
+    return train_utils.is_preview_enabled(config)
+
+
+def has_explicit_sample_prompt_source(config: dict) -> bool:
+    return train_utils.has_explicit_sample_prompt_source(config)
+
+
+def should_generate_sample_prompts(config: dict) -> bool:
+    return train_utils.should_generate_sample_prompts(config)
 
 
 def _detect_best_attn_mode() -> str:
@@ -631,7 +639,7 @@ async def create_toml_file(request: Request):
             return APIResponseFail(message=f"Prompt 文件 {prompt_file} 不存在，请检查路径。")
         config["sample_prompts"] = prompt_file
         train_utils.normalize_sample_prompt_file(prompt_file)
-    else:
+    elif should_generate_sample_prompts(config):
         try:
             positive_prompt, sample_prompts_arg = get_sample_prompts(config=config, model_train_type=model_train_type)
 
@@ -645,6 +653,8 @@ async def create_toml_file(request: Request):
         except ValueError as e:
             log.error(f"Error while processing prompts: {e}")
             return APIResponseFail(message=str(e))
+    else:
+        train_utils.strip_disabled_preview_fields(config)
 
     if config.get("sample_prompts"):
         train_utils.normalize_sample_prompt_file(str(config["sample_prompts"]))
