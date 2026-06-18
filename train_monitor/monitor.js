@@ -706,7 +706,7 @@ function renderLossChart(metrics, status) {
       : "真实 scalar 曲线，和 TensorBoard 同源") + '</span>';
 
   area.className = "tb-loss-grid";
-  const hasLearningRate = series.some(function(item) { return /^lr\//.test(item.tag); });
+  const hasLearningRate = series.some(function(item) { return item.tag === "lr" || /^lr\//.test(item.tag); });
   const displaySeries = hasLearningRate ? series : series.concat([{
     tag: "lr",
     name: "learning rate",
