@@ -1,7 +1,6 @@
 ﻿$Env:HF_HOME = "huggingface"
 $Env:MIKAZUKI_TAGGER_MODELS_DIR = "tagger-models"
 $Env:PIP_DISABLE_PIP_VERSION_CHECK = 1
-$Env:PIP_NO_CACHE_DIR = 1
 $Env:PIP_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple"
 
 . "$PSScriptRoot\install_preflight.ps1"
@@ -39,6 +38,9 @@ $PytorchSources = @(
         Url = "https://download.pytorch.org/whl/cu128"
     }
 )
+
+$TorchInstallRetriesPerSource = 5
+$PackageInstallRetriesPerSource = 2
 
 function Test-PytorchSource {
     param ($Source)
@@ -108,6 +110,29 @@ function Get-PipSourceArgs {
     return @("--index-url", $Source.Url)
 }
 
+function Invoke-PipInstallWithRetries {
+    param (
+        [string]$Label,
+        [string[]]$PackageArgs,
+        $Source,
+        [int]$RetriesPerSource
+    )
+
+    $sourceArgs = Get-PipSourceArgs $Source
+    for ($attempt = 1; $attempt -le $RetriesPerSource; $attempt++) {
+        if ($attempt -gt 1) {
+            Write-Output ("{0} 网络波动，继续使用当前源重试 ({1}/{2}): {3}" -f $Label, $attempt, $RetriesPerSource, $Source.Name)
+        }
+
+        python -m pip install --retries 5 --timeout 60 --resume-retries 5 @PackageArgs @sourceArgs
+        if ($LASTEXITCODE -eq 0) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 if (-not (Test-InstallScriptFreshness)) { InstallFail }
 
 if (Test-Path -Path "python\python.exe") {
@@ -145,17 +170,15 @@ $install_torch = Read-Host "是否需要安装 Torch+xformers? [y/n] (默认为 
 if ($install_torch -eq "y" -or $install_torch -eq "Y" -or $install_torch -eq "") {
     $pytorchSources = @(Select-PytorchSources)
     $pytorchSource = $null
-    $pytorchSourceArgs = $null
     $torchInstalled = $false
 
     foreach ($source in $pytorchSources) {
         if ($pytorchSource -ne $null) {
-            Write-Output ("正在尝试备用源: {0}" -f $source.Name)
+            Write-Output ("Torch 当前源连续失败，正在尝试备用源: {0}" -f $source.Name)
         }
         $pytorchSource = $source
-        $pytorchSourceArgs = Get-PipSourceArgs $source
-        python -m pip install torch==2.7.0+cu128 torchvision==0.22.0+cu128 @pytorchSourceArgs
-        if ($LASTEXITCODE -eq 0) {
+        Write-Output ("正在安装 Torch，当前源: {0}" -f $pytorchSource.Name)
+        if (Invoke-PipInstallWithRetries -Label "Torch" -PackageArgs @("torch==2.7.0+cu128", "torchvision==0.22.0+cu128") -Source $pytorchSource -RetriesPerSource $TorchInstallRetriesPerSource) {
             $torchInstalled = $true
             break
         }
@@ -166,16 +189,29 @@ if ($install_torch -eq "y" -or $install_torch -eq "Y" -or $install_torch -eq "")
         InstallFail
     }
 
-    python -m pip install -U -I --no-deps xformers==0.0.30 @pytorchSourceArgs
-    if (!($?)) {
-        Write-Output "xformers 使用最快源安装失败，正在回退到 PyTorch 官方源..."
-        python -m pip install -U -I --no-deps xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
-        Check "xformers 安装失败。"
+    if (-not (Invoke-PipInstallWithRetries -Label "xformers" -PackageArgs @("-U", "-I", "--no-deps", "xformers==0.0.30") -Source $pytorchSource -RetriesPerSource $PackageInstallRetriesPerSource)) {
+        Write-Output "xformers 使用当前源安装失败，正在回退到 PyTorch 官方源..."
+        $officialSource = @{
+            Name = "PyTorch Official"
+            Mode = "index-url"
+            Url = "https://download.pytorch.org/whl/cu128"
+        }
+        if (-not (Invoke-PipInstallWithRetries -Label "xformers" -PackageArgs @("-U", "-I", "--no-deps", "xformers==0.0.30") -Source $officialSource -RetriesPerSource $PackageInstallRetriesPerSource)) {
+            Write-Output "xformers 安装失败。"
+            InstallFail
+        }
     }
 }
 
-python -m pip install --upgrade -r requirements.txt
-Check "训练依赖库安装失败。"
+$requirementsSource = @{
+    Name = "Python 镜像源"
+    Mode = "index-url"
+    Url = $Env:PIP_INDEX_URL
+}
+if (-not (Invoke-PipInstallWithRetries -Label "训练依赖" -PackageArgs @("--upgrade", "-r", "requirements.txt") -Source $requirementsSource -RetriesPerSource $PackageInstallRetriesPerSource)) {
+    Write-Output "训练依赖库安装失败。"
+    InstallFail
+}
 
 Write-Output "预下载默认 WD 打标模型 wd14-convnextv2-v2（约 388MB，首次较慢）..."
 python scripts/prefetch_default_tagger.py --if-missing --tagger-models-dir "$Env:MIKAZUKI_TAGGER_MODELS_DIR"
