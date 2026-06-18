@@ -1,6 +1,8 @@
 import unittest
 from pathlib import Path
 
+from scripts import patch_config_import_layout
+
 
 class TrainSubmitLoadingStaticTests(unittest.TestCase):
     def test_standard_train_button_shows_immediate_submit_feedback(self):
@@ -20,6 +22,37 @@ class TrainSubmitLoadingStaticTests(unittest.TestCase):
         self.assertIn("finally{submitLoading.value=!1", layout)
         self.assertIn("loading:submitLoading.value", layout)
         self.assertIn("disabled:submitLoading.value", layout)
+
+    def test_imported_string_learning_rates_are_normalized_before_exponential_formatting(self):
+        layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertNotIn("let r=e[t].toExponential()", layout)
+        self.assertIn(
+            'if(typeof v==="string"){const p=parseFloat(v);v=Number.isNaN(p)?v:p}',
+            layout,
+        )
+        self.assertIn('if(typeof v!=="number"||Number.isNaN(v))continue;', layout)
+        self.assertIn("let r=v.toExponential()", layout)
+
+    def test_patch_script_replaces_unsafe_parse_params_re_float_formatting(self):
+        label, old, new = next(
+            item
+            for item in patch_config_import_layout.UPGRADE_REPLACEMENTS
+            if item[0] == "parseParamsRe string learning rates"
+        )
+        original = old + 'if(e.hasOwnProperty("network_args")){}'
+
+        patched = patch_config_import_layout._replace_once(original, label, old, new)
+
+        self.assertNotIn("let r=e[t].toExponential()", patched)
+        self.assertIn(
+            'if(typeof v==="string"){const p=parseFloat(v);v=Number.isNaN(p)?v:p}',
+            patched,
+        )
+        self.assertIn('if(typeof v!=="number"||Number.isNaN(v))continue;', patched)
+        self.assertIn("let r=v.toExponential()", patched)
 
 
 if __name__ == "__main__":
