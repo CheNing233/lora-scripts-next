@@ -5,6 +5,16 @@ from mikazuki.app.api import apply_anima_training_defaults
 
 
 class AnimaTrainingDefaultsTests(unittest.TestCase):
+    def test_schema_notes_lokr_train_norm_guardrail(self):
+        from pathlib import Path
+
+        schema = (Path(__file__).resolve().parents[1] / "mikazuki" / "schema" / "shared.ts").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Anima LoKr", schema)
+        self.assertIn("train_norm", schema)
+
     def test_anima_does_not_auto_enable_full_bf16_for_non_lokr(self):
         config = {
             "mixed_precision": "bf16",

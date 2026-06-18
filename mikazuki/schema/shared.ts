@@ -50,7 +50,7 @@
                 conv_dim: Schema.number().default(4),
                 conv_alpha: Schema.number().default(1),
                 dropout: Schema.number().step(0.01).default(0).description('dropout 概率。推荐 0~0.5，LoHa/LoKr/(IA)^3暂不支持'),
-                train_norm: Schema.boolean().default(false).description('训练 Norm 层，不支持 (IA)^3'),
+                train_norm: Schema.boolean().default(false).description('训练 Norm 层，不支持 (IA)^3。Anima LoKr 会自动禁用 train_norm 以避免 LyCORIS NormModule 采样崩溃。'),
             }),
             Schema.object({}),
         ]),

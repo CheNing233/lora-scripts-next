@@ -194,6 +194,33 @@ class AnimaBackendAdapterTests(unittest.TestCase):
         self.assertIn("dropout=0", na)
         self.assertIn("module_dropout=0.0", na)
 
+    def test_lokr_train_norm_is_disabled_with_warning(self):
+        config = {
+            "network_module": "lycoris.kohya",
+            "lycoris_algo": "lokr",
+            "train_norm": True,
+        }
+
+        adapted, warnings = adapt_anima_config(config)
+
+        self.assertIn("network_args", adapted)
+        self.assertIn("algo=lokr", adapted["network_args"])
+        self.assertNotIn("train_norm=True", adapted["network_args"])
+        self.assertTrue(any("train_norm" in warning and "LoKr" in warning for warning in warnings))
+
+    def test_lycoris_non_lokr_keeps_train_norm(self):
+        config = {
+            "network_module": "lycoris.kohya",
+            "lycoris_algo": "locon",
+            "train_norm": True,
+        }
+
+        adapted, warnings = adapt_anima_config(config)
+
+        self.assertIn("algo=locon", adapted["network_args"])
+        self.assertIn("train_norm=True", adapted["network_args"])
+        self.assertEqual(warnings, [])
+
     def test_learning_rate_fills_missing_component_lrs(self):
         config = {
             "network_module": "lycoris.kohya",

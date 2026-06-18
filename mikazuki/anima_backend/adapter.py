@@ -193,6 +193,11 @@ LYCORIS_NETWORK_ARG_MAP: dict[str, str] = {
     "dropout": "dropout",
 }
 
+LOKR_TRAIN_NORM_WARNING = (
+    "LyCORIS train_norm is disabled for Anima LoKr because LyCORIS NormModule "
+    "can crash on Anima norm layers without affine weights during preview sampling."
+)
+
 
 def _is_empty_value(value: Any) -> bool:
     """Check if a value is empty/invalid (None, NaN, 'undefined', 'null', '')."""
@@ -253,6 +258,30 @@ def _apply_lr_fallback(source: dict[str, Any]) -> None:
             source[key] = learning_rate
 
 
+def _network_args_use_lokr(network_args: list[str]) -> bool:
+    for item in network_args:
+        if not isinstance(item, str) or "=" not in item:
+            continue
+        key, value = item.split("=", 1)
+        if key.strip().lower() == "algo" and value.strip().lower() == "lokr":
+            return True
+    return False
+
+
+def _strip_arg(network_args: list[str], arg_key: str) -> tuple[list[str], bool]:
+    stripped: list[str] = []
+    removed = False
+    target = arg_key.strip().lower()
+    for item in network_args:
+        if isinstance(item, str) and "=" in item:
+            key, _value = item.split("=", 1)
+            if key.strip().lower() == target:
+                removed = True
+                continue
+        stripped.append(item)
+    return stripped, removed
+
+
 def adapt_anima_config(
     config: dict[str, Any], *, finetune: bool = False
 ) -> tuple[dict[str, Any], list[str]]:
@@ -309,6 +338,10 @@ def adapt_anima_config(
             if _is_empty_value(value):
                 continue
             network_args.append(f"{arg_key}={value}")
+        if _network_args_use_lokr(network_args):
+            network_args, removed_train_norm = _strip_arg(network_args, "train_norm")
+            if removed_train_norm:
+                warnings.append(LOKR_TRAIN_NORM_WARNING)
         if network_args:
             source["network_args"] = network_args
 
