@@ -106,6 +106,42 @@ class StandardRunApiTests(unittest.TestCase):
             self.assertEqual(trainer_file, "./scripts/stable/train_network.py")
             self.assertEqual(cpu_threads, 2)
 
+    def test_run_routes_sdxl_lora_to_vendor_trainer(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            data_dir = root / "dataset"
+            image_dir = data_dir / "1_class"
+            image_dir.mkdir(parents=True)
+            (image_dir / "sample.png").write_bytes(b"not-used-by-mocked-runner")
+            model_path = root / "model.safetensors"
+            model_path.write_bytes(b"not-used-by-mocked-runner")
+
+            payload = {
+                "model_train_type": "sdxl-lora",
+                "train_data_dir": str(data_dir),
+                "pretrained_model_name_or_path": str(model_path),
+                "output_dir": str(root / "output"),
+                "output_name": "unit-sdxl-lora",
+                "enable_preview": False,
+            }
+            fake_response = api.APIResponseSuccess(
+                message="Training started",
+                data={
+                    "task_id": "task-sdxl",
+                    "metadata": {"backend": "standard", "trainer_file": "./vendor/sd-scripts/sdxl_train_network.py"},
+                },
+            )
+
+            with mock.patch.object(api.os, "getcwd", return_value=str(root)), \
+                    mock.patch.object(api.process, "run_train", return_value=fake_response) as run_train:
+                response = asyncio.run(api.create_toml_file(make_request(payload)))
+
+            self.assertEqual(response.status, "success")
+            run_train.assert_called_once()
+            _toml_path, trainer_file, _gpu_ids, cpu_threads = run_train.call_args.args
+            self.assertEqual(trainer_file, "./vendor/sd-scripts/sdxl_train_network.py")
+            self.assertEqual(cpu_threads, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
