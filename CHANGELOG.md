@@ -3,6 +3,20 @@
 本文件记录 **wochenlong/lora-scripts-next** 面向镜像与 AutoDL 的发行说明；上游 kohya-ss/sd-scripts 的变更请见其仓库。
 
 ---
+## v2.8.0 - 2026-06-19
+
+### Release blockers
+
+- **Tagger startup**: hardened local WD14 ONNX loading with model-size checks, ONNX Runtime provider diagnostics, CPU fallback, and a bounded load timeout so a bad CUDA/session init no longer leaves users at an endless loading state.
+- **Legacy tag editor**: restored the legacy Gradio Dataset Tag Editor as a default startup path for existing users while keeping `--disable-tageditor` as the opt-out switch.
+- **SDXL LoRA training**: fixed the WebUI/API `sdxl-lora` route to use the vendored SDXL trainer path that matches the current sd-scripts strategy stack. Verified through `/api/run` -> `process.run_train()` -> TaskManager -> accelerate -> `vendor/sd-scripts/sdxl_train_network.py`, completing a 20-step SDXL smoke run and writing a LoRA `.safetensors` artifact.
+
+### Packaging notes
+
+- Build the 2.8.0 portable package only from a clean `origin/main` that includes the SDXL route fix from #146.
+- Pre-release validation must include: default WD14 tagging from bundled `tagger-models/`, legacy `/tageditor.md` + `/proxy/tageditor/`, and a real SDXL LoRA smoke training run that reaches training steps and saves a model.
+
+---
 
 ## v2.7.1 — 2026-06-14
 
