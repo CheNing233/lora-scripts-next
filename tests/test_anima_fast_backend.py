@@ -14,6 +14,7 @@ from mikazuki.anima_fast_backend.adapter import (
     ensure_fast_run_log_dirs,
 )
 from mikazuki.anima_fast_backend.extension_state import (
+    STATE_BROKEN,
     STATE_INSTALLED_UNVERIFIED,
     STATE_NOT_INSTALLED,
     STATE_READY,
@@ -73,13 +74,20 @@ class ServiceResolverTests(unittest.TestCase):
 
 
 class ExtensionStateTests(unittest.TestCase):
+    def _make_ready_source(self, layout: ExtensionLayout) -> None:
+        layout.source.mkdir(parents=True)
+        layout.train_py.write_text("", encoding="utf-8")
+        (layout.source / "configs").mkdir()
+        (layout.source / "configs" / "base.toml").write_text("", encoding="utf-8")
+        (layout.source / "preprocess").mkdir()
+        (layout.source / "preprocess" / "resize_images.py").write_text("", encoding="utf-8")
+
     def test_status_transitions(self):
         with tempfile.TemporaryDirectory() as td:
             layout = ExtensionLayout(Path(td) / "anima_lora")
 
             self.assertEqual(read_extension_status(layout).state, STATE_NOT_INSTALLED)
-            layout.source.mkdir(parents=True)
-            layout.train_py.write_text("", encoding="utf-8")
+            self._make_ready_source(layout)
             self.assertEqual(read_extension_status(layout).state, STATE_INSTALLED_UNVERIFIED)
             layout.venv_python.parent.mkdir(parents=True)
             layout.venv_python.write_text("", encoding="utf-8")
@@ -89,6 +97,21 @@ class ExtensionStateTests(unittest.TestCase):
 
         self.assertEqual(status.state, STATE_READY)
         self.assertEqual(status.facts["torch"], "ok")
+
+    def test_ready_state_downgrades_when_runtime_files_are_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            layout = ExtensionLayout(Path(td) / "anima_lora")
+            layout.source.mkdir(parents=True)
+            layout.train_py.write_text("", encoding="utf-8")
+            layout.venv_python.parent.mkdir(parents=True)
+            layout.venv_python.write_text("", encoding="utf-8")
+            write_install_state(layout, STATE_READY, {"audit": {"ok": True}})
+
+            status = read_extension_status(layout)
+
+        self.assertEqual(status.state, STATE_BROKEN)
+        self.assertIn("configs/base.toml", status.reason)
+        self.assertIn("preprocess/resize_images.py", status.reason)
 
 
 class InstallerTests(unittest.TestCase):

@@ -36,6 +36,14 @@ class AnimaFastPluginApiTests(unittest.TestCase):
         else:
             os.environ["LORA_ENABLE_ANIMA_FAST"] = self.previous
 
+    def _make_ready_source(self, layout: ExtensionLayout) -> None:
+        layout.source.mkdir(parents=True)
+        layout.train_py.write_text("", encoding="utf-8")
+        (layout.source / "configs").mkdir()
+        (layout.source / "configs" / "base.toml").write_text("", encoding="utf-8")
+        (layout.source / "preprocess").mkdir()
+        (layout.source / "preprocess" / "resize_images.py").write_text("", encoding="utf-8")
+
     def test_preflight_fail_message_includes_errors(self):
         result = PreflightResult(
             ok=False,
@@ -131,8 +139,7 @@ class AnimaFastPluginApiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             layout = ExtensionLayout(root / "extensions" / "anima_lora")
-            layout.source.mkdir(parents=True)
-            layout.train_py.write_text("", encoding="utf-8")
+            self._make_ready_source(layout)
             layout.venv_python.parent.mkdir(parents=True)
             layout.venv_python.write_text("", encoding="utf-8")
             audit = {"ok": True, "facts": {"anima": {"imports": {"torch": True}}}}
@@ -161,8 +168,7 @@ class AnimaFastPluginApiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             layout = ExtensionLayout(root / "extensions" / "anima_lora")
-            layout.source.mkdir(parents=True)
-            layout.train_py.write_text("", encoding="utf-8")
+            self._make_ready_source(layout)
             layout.venv_python.parent.mkdir(parents=True)
             layout.venv_python.write_text("", encoding="utf-8")
             write_install_state(layout, STATE_READY, {"audit": {"ok": True}})
@@ -181,8 +187,7 @@ class AnimaFastPluginApiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             layout = ExtensionLayout(root / "extensions" / "anima_lora")
-            layout.source.mkdir(parents=True)
-            layout.train_py.write_text("", encoding="utf-8")
+            self._make_ready_source(layout)
             layout.venv_python.parent.mkdir(parents=True)
             layout.venv_python.write_text("", encoding="utf-8")
             write_install_state(layout, STATE_READY, {"audit": {"ok": True}})
