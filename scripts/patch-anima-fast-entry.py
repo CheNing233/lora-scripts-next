@@ -99,14 +99,13 @@ def write_page_chunks() -> None:
         f'n=e("p",null,{json.dumps(FAST_PAGE_INTRO)},-1),'
         f'x=e("div",{{class:"anima-fast-credit-root",innerHTML:{credit_json}}}),'
         f'd=e("div",{{class:"anima-fast-doc-links-root",innerHTML:{json.dumps(FAST_DOC_LINKS_HTML)}}}),'
-        'r=e("p",null,"标准模式（Kohya）见 /lora/sd3.html",-1),'
         f'g=e("div",{{class:"anima-fast-guide-root",innerHTML:{guide_json}}}),'
         'm=e("div",{class:"anima-fast-install-panel",style:"display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0;"},['
         'e("button",{"data-anima-fast-install":"",type:"button",class:"el-button el-button--primary is-plain"},['
         'e("span",null,"开启插件")]),'
         'e("span",{"data-anima-fast-status":"",style:"font-size:13px;opacity:.8;"},"检查中")],-1),'
         'f=e("pre",{"data-anima-fast-log":"",hidden:"",style:"max-height:260px;overflow:auto;margin:12px 0;padding:10px;border:1px solid var(--c-border);border-radius:6px;font-size:12px;line-height:1.45;white-space:pre-wrap;"},null,-1),'
-        "l=[c,n,x,d,r,g,m,f];"
+        "l=[c,n,x,d,g,m,f];"
         'function i(h,u){return t(),o("div",{class:"anima-fast-intro-wrap"},l)}'
         'var p=s(_,[["render",i],["__file","anima-fast.html.vue"]]);export{p as default};'
     )

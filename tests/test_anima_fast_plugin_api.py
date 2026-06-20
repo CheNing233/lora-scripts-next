@@ -127,6 +127,27 @@ class AnimaFastPluginApiTests(unittest.TestCase):
         self.assertIn("/install/log/stream/task-1", response.data["log_stream"])
         starter.assert_called_once()
 
+    def test_install_returns_existing_ready_status_without_reinstalling(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            layout = ExtensionLayout(root / "extensions" / "anima_lora")
+            layout.source.mkdir(parents=True)
+            layout.train_py.write_text("", encoding="utf-8")
+            layout.venv_python.parent.mkdir(parents=True)
+            layout.venv_python.write_text("", encoding="utf-8")
+            audit = {"ok": True, "facts": {"anima": {"imports": {"torch": True}}}}
+            write_install_state(layout, STATE_READY, {"audit": audit})
+
+            with mock.patch("mikazuki.app.api.Path.cwd", return_value=root), \
+                mock.patch("mikazuki.app.api.start_install_task") as starter:
+                response = asyncio.run(api.anima_lora_plugin_install(make_request({"dry_run": False})))
+
+        self.assertEqual(response.status, "success")
+        self.assertTrue(response.data["already_ready"])
+        self.assertEqual(response.data["status"]["state"], STATE_READY)
+        self.assertEqual(response.data["message"], "Anima Fast plugin is already ready")
+        starter.assert_not_called()
+
     def test_run_rejects_anima_fast_when_extension_is_not_ready(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
