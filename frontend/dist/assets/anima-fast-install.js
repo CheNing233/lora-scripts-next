@@ -27,14 +27,31 @@
     document.body.classList.toggle("anima-fast-page", isFastPage());
   }
 
+  function dedupeInstallPanels(ready) {
+    q(".anima-fast-install-panel").forEach(function (panel, index) {
+      const duplicateReadyPanel = ready && index > 0;
+      panel.hidden = duplicateReadyPanel;
+      panel.style.display = duplicateReadyPanel ? "none" : "flex";
+    });
+  }
+
   function setControls(d) {
     if (!isFastPage()) return;
     const kill = !d.feature_enabled;
     const working = d.state === "installing" || d.state === "auditing";
     const ready = d.state === "ready";
+    dedupeInstallPanels(ready);
     q("[data-anima-fast-install]").forEach(function (b) {
-      b.disabled = kill || working;
+      b.hidden = ready;
+      b.style.display = ready ? "none" : "";
+      b.disabled = kill || working || ready;
       b.setAttribute("aria-disabled", b.disabled ? "true" : "false");
+      b.setAttribute("data-anima-fast-ready", ready ? "1" : "0");
+      if (!b.getAttribute("data-anima-fast-original-label")) {
+        b.setAttribute("data-anima-fast-original-label", (b.textContent || "").trim());
+      }
+      const span = b.querySelector("span") || b;
+      span.textContent = ready ? label(d) : b.getAttribute("data-anima-fast-original-label");
     });
     q(".right-container button").forEach(function (b) {
       const t = (b.textContent || "").trim();
@@ -63,6 +80,18 @@
     if (d.state === "broken") return "需修复";
     if (d.state === "installed_unverified") return "待审计";
     return "进阶插件 · 待开启";
+  }
+
+  function syncStatusLabels(d) {
+    const text = label(d);
+    const title =
+      d.state === "ready"
+        ? "核心可训练依赖齐全；sam3/遮罩等可选依赖按需安装，不影响训练就绪状态。"
+        : "";
+    q("[data-anima-fast-status]").forEach(function (n) {
+      if (n.textContent !== text) n.textContent = text;
+      if (n.title !== title) n.title = title;
+    });
   }
 
   function appendLog(x) {
@@ -319,14 +348,7 @@
   function apply(d) {
     last = d || last;
     setControls(last);
-    const n = document.querySelector("[data-anima-fast-status]");
-    if (n) {
-      n.textContent = label(last);
-      n.title =
-        last.state === "ready"
-          ? "核心可训练依赖齐全；sam3/遮罩等可选依赖按需安装，不影响训练就绪状态。"
-          : "";
-    }
+    syncStatusLabels(last);
     const a = last.facts && last.facts.audit;
     if (a && !a.ok && a.errors) appendLog("[audit] " + a.errors.join("; "));
     syncAuditOptionGuards();
@@ -356,6 +378,8 @@
       initGuideToggle();
       ensureSidebarFastLink();
       initCompileModeGuard();
+      setControls(last);
+      if (last.state !== "unknown") syncStatusLabels(last);
       syncAuditOptionGuards();
       if (pathChanged) status();
     }, 120);
@@ -454,6 +478,10 @@
     const installBtn = e.target && e.target.closest && e.target.closest("[data-anima-fast-install]");
     if (!installBtn || !isFastPage()) return;
     if (!last.feature_enabled) return;
+    if (last.state === "ready" || installBtn.getAttribute("data-anima-fast-ready") === "1") {
+      status();
+      return;
+    }
     if (!window.confirm(CONFIRM)) return;
 
     installBtn.disabled = true;
@@ -478,6 +506,12 @@
         return;
       }
       const d = j.data || {};
+      if (d.already_ready) {
+        last = Object.assign({ feature_enabled: true }, d.status || last, { state: "ready" });
+        apply(last);
+        appendLog("[skip] Anima Fast plugin already ready; no dependency install needed");
+        return;
+      }
       if (statusEl) statusEl.textContent = "安装中";
       appendLog("[task] " + (d.task_id || "unknown"));
       openLog(

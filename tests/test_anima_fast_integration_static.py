@@ -55,6 +55,7 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         page = Path("frontend/dist/lora/anima-fast.html")
         data = Path("frontend/dist/assets/anima-fast.html.data.js")
         component = Path("frontend/dist/assets/anima-fast.html.page.js")
+        installer = Path("frontend/dist/assets/anima-fast-install.js").read_text(encoding="utf-8")
 
         self.assertTrue(page.is_file())
         self.assertTrue(data.is_file())
@@ -69,6 +70,15 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertIn("anima-fast-credit", page.read_text(encoding="utf-8"))
         self.assertIn("anima-fast-doc-links", page.read_text(encoding="utf-8"))
         self.assertIn("docs/anima-fast.md", page.read_text(encoding="utf-8"))
+        self.assertNotIn("标准模式（Kohya）见 /lora/sd3.html", component.read_text(encoding="utf-8"))
+        self.assertNotIn("标准模式（Kohya）见 /lora/sd3.html", page.read_text(encoding="utf-8"))
+        self.assertIn("data-anima-fast-ready", installer)
+        self.assertIn("b.hidden = ready", installer)
+        self.assertIn('b.style.display = ready ? "none" : ""', installer)
+        self.assertIn('q("[data-anima-fast-status]").forEach', installer)
+        self.assertIn("dedupeInstallPanels", installer)
+        self.assertIn("setControls(last);", installer)
+        self.assertIn("already_ready", installer)
 
     def test_benchmark_example_configs_exist(self):
         examples = Path("docs/examples")

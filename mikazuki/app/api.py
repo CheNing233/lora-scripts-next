@@ -808,6 +808,10 @@ async def anima_lora_plugin_dry_run(request: Request):
 
 @router.post("/plugins/anima-lora/install")
 async def anima_lora_plugin_install(request: Request):
+    return await _anima_lora_plugin_install_impl(request, force_install=False)
+
+
+async def _anima_lora_plugin_install_impl(request: Request, force_install: bool = False):
     if not feature_enabled():
         return _anima_fast_disabled_response()
     payload: dict = json.loads((await request.body()).decode("utf-8") or "{}")
@@ -815,6 +819,14 @@ async def anima_lora_plugin_install(request: Request):
     source_commit = str(payload.get("source_commit") or runtime.source_commit or "").strip() or None
     dry_run = payload.get("dry_run", True) is not False
     project_root = Path.cwd()
+    layout = default_layout(project_root)
+    current_status = read_extension_status(layout)
+    if not dry_run and not force_install and current_status.state == STATE_READY:
+        return APIResponseSuccess(data={
+            "already_ready": True,
+            "status": current_status.as_dict(),
+            "message": "Anima Fast plugin is already ready",
+        })
     explicit = payload.get("source_root") or os.environ.get("ANIMA_LORA_ROOT")
     try:
         source_root = resolve_install_source_root(
@@ -825,7 +837,6 @@ async def anima_lora_plugin_install(request: Request):
         )
     except InstallSourceError as exc:
         return APIResponseFail(message=str(exc))
-    layout = default_layout(project_root)
     plan = build_install_plan(source_root, layout, dry_run=dry_run, source_commit=source_commit)
     data = {"plan": plan.as_dict()}
     if dry_run:
@@ -844,7 +855,7 @@ async def anima_lora_plugin_install(request: Request):
 
 @router.post("/plugins/anima-lora/repair")
 async def anima_lora_plugin_repair(request: Request):
-    return await anima_lora_plugin_install(request)
+    return await _anima_lora_plugin_install_impl(request, force_install=True)
 
 
 @router.post("/plugins/anima-lora/uninstall")
