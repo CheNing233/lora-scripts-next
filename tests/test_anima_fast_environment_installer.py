@@ -33,6 +33,14 @@ from mikazuki.tasks import Task, tm
 
 
 class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
+    def _make_runtime_source(self, layout: ExtensionLayout) -> None:
+        layout.source.mkdir(parents=True, exist_ok=True)
+        layout.train_py.write_text("print('train')\n", encoding="utf-8")
+        (layout.source / "configs").mkdir(exist_ok=True)
+        (layout.source / "configs" / "base.toml").write_text("", encoding="utf-8")
+        (layout.source / "preprocess").mkdir(exist_ok=True)
+        (layout.source / "preprocess" / "resize_images.py").write_text("", encoding="utf-8")
+
     def _make_source(self, root: Path) -> Path:
         source = root / "anima_source"
         source.mkdir()
@@ -40,6 +48,8 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
         (source / "pyproject.toml").write_text("[project]\nname='anima-test'\n", encoding="utf-8")
         (source / "configs").mkdir()
         (source / "configs" / "base.toml").write_text("", encoding="utf-8")
+        (source / "preprocess").mkdir()
+        (source / "preprocess" / "resize_images.py").write_text("", encoding="utf-8")
         return source
 
     def _make_constraints(self, project: Path) -> None:
@@ -64,8 +74,7 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
     def test_ready_requires_audit_ok_facts(self):
         with tempfile.TemporaryDirectory() as td:
             layout = ExtensionLayout(Path(td) / "extensions" / "anima_lora")
-            layout.source.mkdir(parents=True)
-            layout.train_py.write_text("", encoding="utf-8")
+            self._make_runtime_source(layout)
             layout.venv_python.parent.mkdir(parents=True)
             layout.venv_python.write_text("", encoding="utf-8")
             from mikazuki.anima_fast_backend.extension_state import write_install_state
@@ -97,8 +106,7 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
                 log("[fake] command completed")
 
             def fake_copy(_plan):
-                layout.source.mkdir(parents=True)
-                layout.train_py.write_text("print('train')\n", encoding="utf-8")
+                self._make_runtime_source(layout)
 
             with mock.patch("mikazuki.anima_fast_backend.environment._uv_command", return_value="uv"), \
                 mock.patch("mikazuki.anima_fast_backend.environment.copy_source_snapshot", side_effect=fake_copy), \
@@ -170,8 +178,7 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             project = Path(td)
             layout = ExtensionLayout(project / "extensions" / "anima_lora")
-            layout.source.mkdir(parents=True)
-            layout.train_py.write_text("", encoding="utf-8")
+            self._make_runtime_source(layout)
             layout.venv_python.parent.mkdir(parents=True)
             layout.venv_python.write_text("", encoding="utf-8")
 
@@ -217,8 +224,7 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
 
             def fake_install(plan, log):
                 attempts["count"] += 1
-                layout.source.mkdir(parents=True, exist_ok=True)
-                layout.train_py.write_text("print('train')\n", encoding="utf-8")
+                self._make_runtime_source(layout)
                 layout.venv_python.parent.mkdir(parents=True, exist_ok=True)
                 layout.venv_python.write_text("", encoding="utf-8")
                 if attempts["count"] == 1:
@@ -407,8 +413,7 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
         ):
             project = Path(td)
             layout = ExtensionLayout(project / "extensions" / "anima_lora")
-            layout.source.mkdir(parents=True)
-            layout.train_py.write_text("", encoding="utf-8")
+            self._make_runtime_source(layout)
             layout.venv_python.parent.mkdir(parents=True)
             layout.venv_python.write_text("", encoding="utf-8")
 
@@ -500,8 +505,7 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
     def test_stale_installing_without_task_marks_broken(self):
         with tempfile.TemporaryDirectory() as td:
             layout = ExtensionLayout(Path(td) / "extensions" / "anima_lora")
-            layout.source.mkdir(parents=True)
-            layout.train_py.write_text("", encoding="utf-8")
+            self._make_runtime_source(layout)
             layout.venv_python.parent.mkdir(parents=True)
             layout.venv_python.write_text("", encoding="utf-8")
             write_install_state(layout, STATE_INSTALLING, {"task_id": "missing-anima-install-task"})
@@ -515,8 +519,7 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
         task_id = "anima-install-reconcile-test"
         with tempfile.TemporaryDirectory() as td:
             layout = ExtensionLayout(Path(td) / "extensions" / "anima_lora")
-            layout.source.mkdir(parents=True)
-            layout.train_py.write_text("", encoding="utf-8")
+            self._make_runtime_source(layout)
             layout.venv_python.parent.mkdir(parents=True)
             layout.venv_python.write_text("", encoding="utf-8")
             audit = {"ok": True, "errors": [], "warnings": [], "facts": {}}
