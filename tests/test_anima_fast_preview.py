@@ -171,6 +171,49 @@ class AnimaFastPreviewTests(unittest.TestCase):
         self.assertTrue(is_preview_enabled({"enable_preview": "true"}))
         self.assertFalse(is_preview_enabled({"enable_preview": False}))
 
+    def test_sample_every_n_epochs_clamped_to_max_train_epochs(self):
+        config = {
+            "enable_preview": True,
+            "max_train_epochs": 1,
+            "sample_every_n_epochs": 2,
+            "positive_prompts": "1girl",
+        }
+        warnings = apply_anima_fast_preview(config, "/tmp/autosave", "run-clamp")
+        self.assertEqual(config["sample_every_n_epochs"], 1)
+        self.assertFalse(config.get("sample_at_first"))
+        self.assertTrue(any("sample_every_n_epochs" in item for item in warnings))
+
+    def test_sample_every_n_epochs_unchanged_when_within_max_epochs(self):
+        config = {
+            "enable_preview": True,
+            "max_train_epochs": 3,
+            "sample_every_n_epochs": 2,
+            "positive_prompts": "1girl",
+        }
+        warnings = apply_anima_fast_preview(config, "/tmp/autosave", "run-ok")
+        self.assertEqual(config["sample_every_n_epochs"], 2)
+        self.assertFalse(any("已从 2 调整为" in item for item in warnings))
+
+    def test_sample_schedule_skipped_when_sampling_by_steps(self):
+        config = {
+            "enable_preview": True,
+            "max_train_epochs": 1,
+            "sample_every_n_epochs": 2,
+            "sample_every_n_steps": 100,
+            "positive_prompts": "1girl",
+        }
+        apply_anima_fast_preview(config, "/tmp/autosave", "run-steps")
+        self.assertEqual(config["sample_every_n_epochs"], 2)
+
+    def test_default_sample_every_n_epochs_respects_single_epoch_run(self):
+        config = {
+            "enable_preview": True,
+            "max_train_epochs": 1,
+            "positive_prompts": "1girl",
+        }
+        apply_anima_fast_preview(config, "/tmp/autosave", "run-default")
+        self.assertEqual(config["sample_every_n_epochs"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
