@@ -8,10 +8,12 @@ from typing import Iterable
 
 # Matches vendor/sd-scripts/library/strategy_* TOKENIZER ids and
 # strategy_base._load_tokenizer local dir naming (repo_id with "/" -> "_").
-SDXL_TOKENIZER1_HF_ID = "openai/clip-vit-large-patch14"
+CLIP_L_TOKENIZER_HF_ID = "openai/clip-vit-large-patch14"
+SDXL_TOKENIZER1_HF_ID = CLIP_L_TOKENIZER_HF_ID
 SDXL_TOKENIZER2_HF_ID = "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k"
+FLUX_T5_TOKENIZER_HF_ID = "google/t5-v1_1-xxl"
 
-TOKENIZER_FILES = (
+CLIP_TOKENIZER_FILES = (
     "vocab.json",
     "merges.txt",
     "tokenizer.json",
@@ -19,10 +21,34 @@ TOKENIZER_FILES = (
     "special_tokens_map.json",
 )
 
+T5_TOKENIZER_FILES = (
+    "spiece.model",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "special_tokens_map.json",
+)
+
+# Back-compat alias used by prefetch / build scripts.
+TOKENIZER_FILES = CLIP_TOKENIZER_FILES
+
+TOKENIZER_FILES_BY_REPO: dict[str, tuple[str, ...]] = {
+    CLIP_L_TOKENIZER_HF_ID: CLIP_TOKENIZER_FILES,
+    SDXL_TOKENIZER2_HF_ID: CLIP_TOKENIZER_FILES,
+    FLUX_T5_TOKENIZER_HF_ID: T5_TOKENIZER_FILES,
+}
+
 # Hugging Face repo id -> local cache folder name under tokenizer-cache/
 BUNDLED_TOKENIZER_DIRS: dict[str, str] = {
-    SDXL_TOKENIZER1_HF_ID: SDXL_TOKENIZER1_HF_ID.replace("/", "_"),
-    SDXL_TOKENIZER2_HF_ID: SDXL_TOKENIZER2_HF_ID.replace("/", "_"),
+    repo_id: repo_id.replace("/", "_") for repo_id in TOKENIZER_FILES_BY_REPO
+}
+
+# HF repo ids required per train type for offline tokenizer_cache_dir injection.
+TOKENIZER_REPOS_BY_TRAIN_TYPE: dict[str, tuple[str, ...]] = {
+    "sd-lora": (CLIP_L_TOKENIZER_HF_ID,),
+    "sdxl-lora": (CLIP_L_TOKENIZER_HF_ID, SDXL_TOKENIZER2_HF_ID),
+    "sdxl-finetune": (CLIP_L_TOKENIZER_HF_ID, SDXL_TOKENIZER2_HF_ID),
+    "flux-lora": (CLIP_L_TOKENIZER_HF_ID, FLUX_T5_TOKENIZER_HF_ID),
+    "flux-finetune": (CLIP_L_TOKENIZER_HF_ID, FLUX_T5_TOKENIZER_HF_ID),
 }
 
 from mikazuki.china_hub import HF_TO_MODELSCOPE_REPOS
@@ -66,6 +92,10 @@ def tokenizer_local_dir(cache_root: Path, hf_repo_id: str) -> Path:
     return cache_root / folder
 
 
+def required_tokenizer_files(repo_id: str) -> tuple[str, ...]:
+    return TOKENIZER_FILES_BY_REPO.get(repo_id, CLIP_TOKENIZER_FILES)
+
+
 def is_tokenizer_bundle_complete(
     cache_root: Path,
     hf_repo_ids: Iterable[str] | None = None,
@@ -73,7 +103,7 @@ def is_tokenizer_bundle_complete(
     ids = list(hf_repo_ids or BUNDLED_TOKENIZER_DIRS.keys())
     for repo_id in ids:
         local_dir = tokenizer_local_dir(cache_root, repo_id)
-        if not all((local_dir / name).is_file() for name in TOKENIZER_FILES):
+        if not all((local_dir / name).is_file() for name in required_tokenizer_files(repo_id)):
             return False
     return True
 
@@ -81,13 +111,19 @@ def is_tokenizer_bundle_complete(
 def bundled_tokenizer_cache_dir(
     *,
     explicit: str | os.PathLike | None = None,
+    train_type: str | None = None,
     require_sdxl_pair: bool = True,
 ) -> str | None:
     """Return tokenizer_cache_dir for sd-scripts when the bundled cache is ready."""
     root = resolve_tokenizer_cache_root(explicit)
     if root is None:
         return None
-    ids = list(BUNDLED_TOKENIZER_DIRS.keys()) if require_sdxl_pair else [SDXL_TOKENIZER1_HF_ID]
+    if train_type and train_type in TOKENIZER_REPOS_BY_TRAIN_TYPE:
+        ids = list(TOKENIZER_REPOS_BY_TRAIN_TYPE[train_type])
+    elif require_sdxl_pair:
+        ids = [CLIP_L_TOKENIZER_HF_ID, SDXL_TOKENIZER2_HF_ID]
+    else:
+        ids = [CLIP_L_TOKENIZER_HF_ID]
     if not is_tokenizer_bundle_complete(root, ids):
         return None
     return str(root).replace("\\", "/")

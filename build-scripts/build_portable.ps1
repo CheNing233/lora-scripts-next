@@ -484,7 +484,7 @@ if ($SkipTaggerPrefetch) {
 }
 
 Write-Host ""
-Write-Host "[3b/6] Bundling SDXL tokenizer cache (~7 MB, offline SDXL training)..." -ForegroundColor Cyan
+Write-Host "[3b/6] Bundling SD/SDXL/Flux tokenizer cache (~8 MB, offline training)..." -ForegroundColor Cyan
 
 $tokenizerCacheDir = Join-Path $portableDir "tokenizer-cache"
 New-Item -ItemType Directory -Path $tokenizerCacheDir -Force | Out-Null
@@ -522,13 +522,18 @@ $ErrorActionPreference = $prevEapTokenizer
 if ($tokenizerPrefetchExit -ne 0) {
     throw "SDXL tokenizer prefetch failed (exit $tokenizerPrefetchExit)"
 }
-Write-Host "  Cached under tokenizer-cache/ (offline SDXL tokenizer)" -ForegroundColor Green
+Write-Host "  Cached under tokenizer-cache/ (offline SD/SDXL/Flux tokenizers)" -ForegroundColor Green
 
-foreach ($folder in @("openai_clip-vit-large-patch14", "laion_CLIP-ViT-bigG-14-laion2B-39B-b160k")) {
-    foreach ($name in @("vocab.json", "merges.txt", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json")) {
-        $path = Join-Path $tokenizerCacheDir "$folder\$name"
+$tokenizerBundles = @(
+    @{ Folder = "openai_clip-vit-large-patch14"; Files = @("vocab.json", "merges.txt", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json") },
+    @{ Folder = "laion_CLIP-ViT-bigG-14-laion2B-39B-b160k"; Files = @("vocab.json", "merges.txt", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json") },
+    @{ Folder = "google_t5-v1_1-xxl"; Files = @("spiece.model", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json") }
+)
+foreach ($bundle in $tokenizerBundles) {
+    foreach ($name in $bundle.Files) {
+        $path = Join-Path $tokenizerCacheDir "$($bundle.Folder)\$name"
         if (-not (Test-Path $path)) {
-            throw "SDXL tokenizer cache incomplete after prefetch: $path"
+            throw "Tokenizer cache incomplete after prefetch: $path"
         }
     }
 }

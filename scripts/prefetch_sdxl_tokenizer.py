@@ -14,11 +14,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from mikazuki.china_hub import HF_TO_MODELSCOPE_REPOS  # noqa: E402
 from mikazuki.tokenizer_cache import (  # noqa: E402
     BUNDLED_TOKENIZER_DIRS,
     DEFAULT_TOKENIZER_CACHE_DIRNAME,
-    TOKENIZER_FILES,
+    TOKENIZER_FILES_BY_REPO,
     is_tokenizer_bundle_complete,
+    required_tokenizer_files,
     tokenizer_local_dir,
 )
 
@@ -98,15 +100,19 @@ def ensure_sdxl_tokenizer_cache(
     prefer_modelscope: bool = True,
     hf_endpoint: str = "https://hf-mirror.com",
     force: bool = False,
+    include_flux_t5: bool = True,
 ) -> Path:
     cache_root.mkdir(parents=True, exist_ok=True)
-    if not force and is_tokenizer_bundle_complete(cache_root):
-        print(f"SDXL tokenizer cache already complete: {cache_root}")
+    repo_ids = list(BUNDLED_TOKENIZER_DIRS.keys())
+    if not include_flux_t5:
+        repo_ids = [rid for rid in repo_ids if rid != "google/t5-v1_1-xxl"]
+    if not force and is_tokenizer_bundle_complete(cache_root, repo_ids):
+        print(f"Tokenizer cache already complete: {cache_root}")
         return cache_root
 
-    for hf_repo_id, _folder in BUNDLED_TOKENIZER_DIRS.items():
+    for hf_repo_id in repo_ids:
         local_dir = tokenizer_local_dir(cache_root, hf_repo_id)
-        for filename in TOKENIZER_FILES:
+        for filename in required_tokenizer_files(hf_repo_id):
             dest = local_dir / filename
             if not force and dest.is_file():
                 continue
@@ -119,9 +125,9 @@ def ensure_sdxl_tokenizer_cache(
                 hf_endpoint=hf_endpoint,
             )
 
-    if not is_tokenizer_bundle_complete(cache_root):
+    if not is_tokenizer_bundle_complete(cache_root, repo_ids):
         raise RuntimeError(f"tokenizer cache incomplete after prefetch: {cache_root}")
-    print(f"SDXL tokenizer cache ready: {cache_root}")
+    print(f"Tokenizer cache ready: {cache_root}")
     return cache_root
 
 
@@ -147,6 +153,11 @@ def main() -> int:
         help="Try HTTP mirror first instead of ModelScope",
     )
     parser.add_argument(
+        "--sdxl-only",
+        action="store_true",
+        help="Skip Flux T5-XXL tokenizer (~800 KB) and only prefetch SD/SDXL CLIP tokenizers",
+    )
+    parser.add_argument(
         "--hf-endpoint",
         default=os.environ.get("HF_ENDPOINT", "https://hf-mirror.com"),
         help="HF-style mirror base URL for HTTP fallback",
@@ -154,8 +165,11 @@ def main() -> int:
     args = parser.parse_args()
 
     cache_root = _resolve_cache_root(args.cache_dir or None)
-    if args.if_missing and not args.force and is_tokenizer_bundle_complete(cache_root):
-        print(f"SDXL tokenizer cache already complete: {cache_root}")
+    repo_ids = list(BUNDLED_TOKENIZER_DIRS.keys())
+    if args.sdxl_only:
+        repo_ids = [rid for rid in repo_ids if rid != "google/t5-v1_1-xxl"]
+    if args.if_missing and not args.force and is_tokenizer_bundle_complete(cache_root, repo_ids):
+        print(f"Tokenizer cache already complete: {cache_root}")
         return 0
 
     ensure_sdxl_tokenizer_cache(
@@ -163,6 +177,7 @@ def main() -> int:
         prefer_modelscope=args.prefer_modelscope,
         hf_endpoint=args.hf_endpoint,
         force=args.force,
+        include_flux_t5=not args.sdxl_only,
     )
     return 0
 

@@ -20,10 +20,25 @@ from typing import Any, Callable
 
 _PATCHED = False
 
-# Hugging Face repo id → ModelScope repo id (extend as we validate more assets).
+# Hugging Face repo id → ModelScope repo id.
+#
+# Only list ids that differ on ModelScope, plus same-id passthroughs for discoverability
+# (remap_hf_repo_id returns the key when unlisted).
+#
+# Train-type coverage (vendor/sd-scripts/library/strategy_*.py):
+#   SD1.5      — openai/clip-vit-large-patch14 (remapped)
+#   SDXL/SD3   — clip-l (remapped), laion/CLIP-ViT-bigG-14-laion2B-39B-b160k (same id)
+#   Flux/SD3   — clip-l (remapped), google/t5-v1_1-xxl (same id)
+#   Lumina     — google/gemma-2-2b (same id)
+#   Hunyuan    — google/byt5-small, Qwen/Qwen2.5-VL-7B-Instruct (same ids)
+#   Anima      — no HF hub downloads at runtime (local_files_only + configs/t5_old, qwen3_06b)
 HF_TO_MODELSCOPE_REPOS: dict[str, str] = {
+    # SD1.5 / SDXL / Flux / SD3 — CLIP-L tokenizer
     "openai/clip-vit-large-patch14": "AI-ModelScope/clip-vit-large-patch14",
-    # laion/CLIP-ViT-bigG-14-laion2B-39B-b160k exists under the same id on ModelScope.
+    # Flux / SD3 — T5-XXL tokenizer (verified same repo id on modelscope.cn)
+    "google/t5-v1_1-xxl": "google/t5-v1_1-xxl",
+    # SDXL / SD3 — CLIP-G tokenizer (same repo id on ModelScope)
+    "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k": "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k",
 }
 
 # Back-compat alias used by tokenizer prefetch.

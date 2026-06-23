@@ -13,6 +13,7 @@ from mikazuki.china_hub import (
 
 def test_remap_hf_repo_id():
     assert remap_hf_repo_id("openai/clip-vit-large-patch14") == "AI-ModelScope/clip-vit-large-patch14"
+    assert remap_hf_repo_id("google/t5-v1_1-xxl") == "google/t5-v1_1-xxl"
     assert remap_hf_repo_id("laion/CLIP-ViT-bigG-14-laion2B-39B-b160k") == (
         "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k"
     )
