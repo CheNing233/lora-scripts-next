@@ -6,7 +6,8 @@ import subprocess
 import sys
 
 from mikazuki.launch_utils import (base_dir_path, catch_exception, git_tag,
-                                   prepare_environment, check_port_avaliable)
+                                   prepare_environment, check_port_avaliable,
+                                   ensure_requirements_installed)
 from mikazuki.log import log
 from mikazuki.portable_utils import sanitize_embedded_deps, train_env_overrides
 
@@ -128,6 +129,12 @@ def launch():
 
     if not args.skip_prepare_environment:
         prepare_environment(disable_auto_mirror=args.disable_auto_mirror)
+    else:
+        # Portable launch skips prepare_environment, so requirements.txt is
+        # otherwise never validated. Run a cheap presence-only guard so newly
+        # added or missing packages (e.g. onnxruntime-gpu) get repaired instead
+        # of silently breaking tagging/training.
+        ensure_requirements_installed("requirements.txt")
 
     # Protect each service's default port before scanning fallbacks. Otherwise
     # TensorBoard can claim 6008 as a fallback and make monitor links open it.

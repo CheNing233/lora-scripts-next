@@ -119,8 +119,76 @@ def _separator():
 # ──────────────────── Core logic ────────────────────
 
 
-def check_already_installed():
-    """Return True only when core runtime deps are importable."""
+def _missing_requirements():
+    """Return requirement specs from requirements.txt that are not installed.
+
+    Uses the embedded interpreter's own pip metadata so the check matches what
+    install_requirements would actually install. Triton-windows is skipped to
+    stay consistent with _filter_requirements.
+    """
+    req_file = os.path.join(_sd_trainer_dir(), "requirements.txt")
+    if not os.path.isfile(req_file):
+        return []
+
+    check_src = (
+        "import sys\n"
+        "try:\n"
+        "    from importlib.metadata import distributions\n"
+        "except Exception:\n"
+        "    print('CHECK_UNAVAILABLE'); sys.exit(0)\n"
+        "import re\n"
+        "skip = {'triton-windows', 'triton'}\n"
+        "installed = set()\n"
+        "for dist in distributions():\n"
+        "    name = (dist.metadata['Name'] or '').strip().lower().replace('_', '-')\n"
+        "    if name:\n"
+        "        installed.add(name)\n"
+        "missing = []\n"
+        "with open(sys.argv[1], 'r', encoding='utf-8') as f:\n"
+        "    for raw in f:\n"
+        "        line = raw.strip()\n"
+        "        if not line or line.startswith('#') or line.startswith('-'):\n"
+        "            continue\n"
+        "        if '# skip_verify' in line:\n"
+        "            continue\n"
+        "        spec = line.split('#', 1)[0].strip()\n"
+        "        if ';' in spec:\n"
+        "            cond = spec.split(';', 1)[1]\n"
+        "            if 'win32' in cond and sys.platform != 'win32':\n"
+        "                continue\n"
+        "            if 'linux' in cond and sys.platform != 'linux':\n"
+        "                continue\n"
+        "            spec = spec.split(';', 1)[0].strip()\n"
+        "        name = re.split(r'[<>=!~\\[ ]', spec, 1)[0].strip().lower().replace('_', '-')\n"
+        "        if not name or name in skip:\n"
+        "            continue\n"
+        "        if name not in installed:\n"
+        "            missing.append(name)\n"
+        "for m in missing:\n"
+        "    print(m)\n"
+    )
+    try:
+        result = subprocess.run(
+            [_python_exe(), "-s", "-c", check_src, req_file],
+            capture_output=True, text=True, timeout=60,
+            env={**os.environ, "PYTHONNOUSERSITE": "1"},
+        )
+    except Exception:
+        return []
+    out = (result.stdout or "").strip()
+    if not out or "CHECK_UNAVAILABLE" in out:
+        return []
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def check_already_installed(quiet=False):
+    """Return True only when core runtime deps are importable AND every
+    requirements.txt package is present. A missing requirement (e.g. a newly
+    added onnxruntime-gpu after an update) triggers the repair install path."""
+    def _say(msg):
+        if not quiet:
+            print(msg)
+
     torch_dir = os.path.join(
         _base_dir(), "python_embeded", "Lib", "site-packages", "torch"
     )
@@ -132,8 +200,14 @@ def check_already_installed():
         try:
             __import__(module)
         except Exception as exc:
-            print(f"  检测到依赖不完整，将执行修复安装：{module} ({exc})")
+            _say(f"  检测到依赖不完整，将执行修复安装：{module} ({exc})")
             return False
+
+    missing = _missing_requirements()
+    if missing:
+        preview = ", ".join(missing[:8]) + (" ..." if len(missing) > 8 else "")
+        _say(f"  检测到缺失的依赖，将执行补装：{preview}")
+        return False
 
     return True
 
@@ -358,12 +432,49 @@ def verify_installation():
 # ──────────────────── Main ────────────────────
 
 
+def _core_modules_ok():
+    torch_dir = os.path.join(
+        _base_dir(), "python_embeded", "Lib", "site-packages", "torch"
+    )
+    if not os.path.isdir(torch_dir):
+        return False
+    for module in ("torch", "torchvision", "accelerate", "diffusers", "gradio"):
+        try:
+            __import__(module)
+        except Exception:
+            return False
+    return True
+
+
+def repair_requirements_only():
+    """Fast path: core/PyTorch already present, only requirements.txt has
+    new/missing packages (e.g. onnxruntime-gpu added by an update). Install
+    just the requirements without re-probing/re-downloading PyTorch."""
+    _banner()
+    region = detect_network()
+    if region == "china":
+        print("  检测到缺失依赖，使用国内镜像补装训练组件...")
+    else:
+        print("  检测到缺失依赖，补装训练组件...")
+    write_mirror_env(region)
+    if not install_requirements(region):
+        _fail("依赖补装失败，请检查网络连接后重新运行 run_gui.bat")
+        return 1
+    _ok("依赖补装完成")
+    return 0
+
+
 def main():
     _banner()
 
     if check_already_installed():
         print("  环境已安装，跳过安装步骤。")
         return 0
+
+    # Lightweight repair: PyTorch + core deps are fine, only some
+    # requirements.txt packages are missing. Avoid the full ~3GB PyTorch path.
+    if _core_modules_ok() and _missing_requirements():
+        return repair_requirements_only()
 
     # GPU check — warn AMD users early
     gpu = detect_gpu()

@@ -235,6 +235,72 @@ def validate_requirements(requirements_file: str):
                     run_pip(f"install \"{spec}\"", spec, live=True)
 
 
+def ensure_requirements_installed(requirements_file: str = "requirements.txt") -> None:
+    """Lightweight presence-only requirements guard for portable launches.
+
+    The portable launcher starts gui.py with --skip-prepare-environment, which
+    bypasses prepare_environment() / validate_requirements(). As a result a
+    fresh-but-incomplete package (e.g. missing onnxruntime-gpu) never gets
+    repaired and tagging/training silently breaks. This runs on every launch,
+    is intentionally cheap (existence check only, no version pinning so it does
+    not fight pip's resolver), and installs only what is actually missing.
+    """
+    req_path = requirements_file
+    if not os.path.isabs(req_path):
+        req_path = str(base_dir_path() / requirements_file)
+    if not os.path.isfile(req_path):
+        return
+
+    try:
+        with open(req_path, "r", encoding="utf8") as f:
+            raw_lines = f.readlines()
+    except OSError as e:
+        log.warning(f"could not read {req_path}: {e}")
+        return
+
+    index_url = ""
+    missing: List[str] = []
+    for raw in raw_lines:
+        line = raw.strip()
+        if (
+            line == ""
+            or line.startswith("#")
+            or "# skip_verify" in line
+            or (line.startswith("-") and not line.startswith("--index-url "))
+        ):
+            continue
+        if line.startswith("--index-url "):
+            index_url = line.replace("--index-url ", "").strip()
+            continue
+
+        spec, marker_matches = _parse_env_marker(line)
+        if not marker_matches:
+            continue
+        # Strip inline comments and keep the bare requirement spec.
+        spec = spec.split("#", 1)[0].strip()
+        if not spec:
+            continue
+        # Presence-only: drop any version constraint so an already-installed
+        # (but differently versioned) package is not flagged as missing.
+        name_only = re.split(r"[<>=!~\[ ]", spec, 1)[0].strip()
+        if not name_only or is_installed(name_only):
+            continue
+        missing.append(spec)
+
+    if not missing:
+        return
+
+    log.info(f"detected missing requirements, installing: {', '.join(missing)}")
+    for spec in missing:
+        try:
+            if index_url:
+                run_pip(f'install "{spec}" --index-url {index_url}', spec, live=True)
+            else:
+                run_pip(f'install "{spec}"', spec, live=True)
+        except Exception as e:
+            log.error(f"failed to install missing requirement {spec}: {e}")
+
+
 def setup_windows_bitsandbytes():
     if sys.platform != "win32":
         return

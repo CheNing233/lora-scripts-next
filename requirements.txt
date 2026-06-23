@@ -43,6 +43,8 @@ httpx==0.24.1
 open-clip-torch==2.20.0
 lycoris-lora==3.3.0
 dadaptation==3.1
+# tagger (WD14 etc.) — required by dataset tagging; NVIDIA portable build uses GPU build
+onnxruntime-gpu
 # triton for Windows — source installs only (portable package skips this)
 # Needed by flash-attn on Windows; portable package has prebuilt flash-attn wheel that bundles triton.
 triton-windows<3.4; sys_platform == "win32" # skip_verify
