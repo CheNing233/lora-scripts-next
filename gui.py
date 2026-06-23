@@ -120,6 +120,10 @@ def run_tag_editor(port: int):
 
 def launch():
     sanitize_embedded_deps(log.warning)
+    from mikazuki.china_hub import enable_china_hub
+
+    if enable_china_hub():
+        log.info("Using ModelScope hub patch for Hugging Face downloads (国内下载走魔搭)")
     for key, value in train_env_overrides().items():
         os.environ.setdefault(key, value)
     log.info("Starting SD-Trainer Mikazuki GUI...")

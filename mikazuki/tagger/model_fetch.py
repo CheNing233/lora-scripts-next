@@ -186,6 +186,10 @@ def use_download_endpoint(endpoint: str | None) -> Iterator[None]:
     try:
         if endpoint_value:
             os.environ["HF_ENDPOINT"] = endpoint_value
+        if endpoint_value in {"https://hf-mirror.com", "https://modelscope.cn"}:
+            from mikazuki.china_hub import enable_china_hub
+
+            enable_china_hub(force=endpoint_value == "https://modelscope.cn")
         yield
     finally:
         if previous is None:

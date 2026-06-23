@@ -78,10 +78,10 @@ def build_accelerate_train_command(
     if mixed_precision:
         launch_opts.extend(["--mixed_precision", mixed_precision])
 
+    launch_entry = Path(__file__).resolve().parent / "accelerate_launch.py"
     args = [
         sys.executable,
-        "-m",
-        "accelerate.commands.launch",
+        str(launch_entry),
         *launch_opts,
         trainer_file,
         "--config_file",

@@ -309,6 +309,24 @@ def get_sample_prompts(config: dict, model_train_type: str = "sd-lora") -> Tuple
     return positive_prompts, sample_prompts_arg
 
 
+TOKENIZER_CACHE_TRAIN_TYPES = frozenset(
+    {"sd-lora", "sdxl-lora", "sdxl-finetune", "flux-lora", "flux-finetune"}
+)
+
+
+def apply_tokenizer_cache_dir(config: dict, model_train_type: str) -> None:
+    """Use bundled tokenizer-cache when available so SD/SDXL/Flux training works offline."""
+    if model_train_type not in TOKENIZER_CACHE_TRAIN_TYPES:
+        return
+    if config.get("tokenizer_cache_dir"):
+        return
+    from mikazuki.tokenizer_cache import bundled_tokenizer_cache_dir
+
+    cache_dir = bundled_tokenizer_cache_dir(train_type=model_train_type)
+    if cache_dir:
+        config["tokenizer_cache_dir"] = cache_dir
+
+
 def apply_sdxl_prediction_type(config: dict, model_train_type: str):
     prediction_type = config.pop("sdxl_prediction_type", None)
     if model_train_type != "sdxl-lora":
@@ -734,6 +752,7 @@ async def create_toml_file(request: Request):
         train_utils.normalize_sample_prompt_file(str(config["sample_prompts"]))
 
     apply_anima_training_defaults(config, model_train_type)
+    apply_tokenizer_cache_dir(config, model_train_type)
     sanitize_config(config)
 
     if not config.get("sample_prompts"):

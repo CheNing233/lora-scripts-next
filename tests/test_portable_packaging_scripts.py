@@ -40,6 +40,18 @@ def test_portable_launcher_keeps_default_hf_mirror_for_skip_prepare_mode():
 
     assert "HF_ENDPOINT" in launcher
     assert "https://hf-mirror.com" in launcher
+    assert "MIKAZUKI_TOKENIZER_CACHE_DIR" in launcher
+    assert "prefetch_sdxl_tokenizer.py" in launcher
+
+
+def test_portable_builder_bundles_sdxl_tokenizer_cache():
+    script = (ROOT / "build-scripts" / "build_portable.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "prefetch_sdxl_tokenizer.py" in script
+    assert "tokenizer-cache" in script
+    assert "openai_clip-vit-large-patch14" in script
 
 
 def test_portable_builder_bundles_visible_tagger_models_directory():

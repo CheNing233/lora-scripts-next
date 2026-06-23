@@ -425,6 +425,13 @@ def prepare_environment(disable_auto_mirror: bool = True, prepare_onnxruntime: b
     if prepare_onnxruntime:
         setup_onnxruntime()
 
+    try:
+        from mikazuki.china_hub import enable_china_hub
+
+        enable_china_hub()
+    except Exception:
+        pass
+
 
 def catch_exception(f):
     def wrapper(*args, **kwargs):
