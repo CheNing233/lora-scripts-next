@@ -1,12 +1,14 @@
-"""Training subprocess entry: enable HF mirror fallback, then run accelerate launch."""
+"""Training subprocess entry: enable China hub routing, then run accelerate launch."""
 
 from __future__ import annotations
 
 import sys
 
-import mikazuki.hf_mirror_bootstrap  # noqa: F401 — patch hf_hub_download before sd-scripts imports
+from mikazuki.china_hub import enable_china_hub
 
-from accelerate.commands.launch import main
+enable_china_hub()
+
+from accelerate.commands.launch import main  # noqa: E402
 
 
 if __name__ == "__main__":

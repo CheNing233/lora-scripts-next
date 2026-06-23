@@ -25,11 +25,10 @@ BUNDLED_TOKENIZER_DIRS: dict[str, str] = {
     SDXL_TOKENIZER2_HF_ID: SDXL_TOKENIZER2_HF_ID.replace("/", "_"),
 }
 
+from mikazuki.china_hub import HF_TO_MODELSCOPE_REPOS
+
 # ModelScope repo ids used when prefetching on build machines (China-friendly).
-MODELSCOPE_TOKENIZER_REPOS: dict[str, str] = {
-    SDXL_TOKENIZER1_HF_ID: "AI-ModelScope/clip-vit-large-patch14",
-    SDXL_TOKENIZER2_HF_ID: "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k",
-}
+MODELSCOPE_TOKENIZER_REPOS: dict[str, str] = HF_TO_MODELSCOPE_REPOS
 
 DEFAULT_TOKENIZER_CACHE_DIRNAME = "tokenizer-cache"
 

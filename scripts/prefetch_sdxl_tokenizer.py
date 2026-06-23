@@ -17,11 +17,12 @@ if str(REPO_ROOT) not in sys.path:
 from mikazuki.tokenizer_cache import (  # noqa: E402
     BUNDLED_TOKENIZER_DIRS,
     DEFAULT_TOKENIZER_CACHE_DIRNAME,
-    MODELSCOPE_TOKENIZER_REPOS,
     TOKENIZER_FILES,
     is_tokenizer_bundle_complete,
     tokenizer_local_dir,
 )
+
+MODELSCOPE_TOKENIZER_REPOS = HF_TO_MODELSCOPE_REPOS
 
 
 def _resolve_cache_root(explicit: str | None) -> Path:
