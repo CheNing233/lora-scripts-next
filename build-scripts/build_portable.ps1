@@ -483,6 +483,56 @@ if ($SkipTaggerPrefetch) {
     }
 }
 
+Write-Host ""
+Write-Host "[3b/6] Bundling SDXL tokenizer cache (~7 MB, offline SDXL training)..." -ForegroundColor Cyan
+
+$tokenizerCacheDir = Join-Path $portableDir "tokenizer-cache"
+New-Item -ItemType Directory -Path $tokenizerCacheDir -Force | Out-Null
+$tokenizerPrefetchScript = Join-Path $sdtDir "scripts\prefetch_sdxl_tokenizer.py"
+if (-not (Test-Path $tokenizerPrefetchScript)) {
+    throw "prefetch script missing: $tokenizerPrefetchScript"
+}
+
+$tokenizerPrefetchPython = $null
+if (Test-Path $pythonExe) {
+    $tokenizerPrefetchPython = $pythonExe
+} elseif (Test-Path (Join-Path $ProjectRoot "venv\Scripts\python.exe")) {
+    $tokenizerPrefetchPython = (Join-Path $ProjectRoot "venv\Scripts\python.exe")
+} elseif (Get-Command python -ErrorAction SilentlyContinue) {
+    $tokenizerPrefetchPython = (Get-Command python).Source
+}
+if (-not $tokenizerPrefetchPython) {
+    throw "No Python available for SDXL tokenizer prefetch"
+}
+
+$prevEapTokenizer = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+if ($tokenizerPrefetchPython -eq $pythonExe) {
+    if (Test-Path $getPipPath) {
+        & $pythonExe $getPipPath --no-warn-script-location 2>&1 | Out-Null
+    }
+    & $tokenizerPrefetchPython -s -m pip install -q modelscope requests 2>&1 | Out-Null
+    & $tokenizerPrefetchPython -s $tokenizerPrefetchScript --cache-dir $tokenizerCacheDir --if-missing --prefer-modelscope
+} else {
+    & $tokenizerPrefetchPython -m pip install -q modelscope requests 2>&1 | Out-Null
+    & $tokenizerPrefetchPython $tokenizerPrefetchScript --cache-dir $tokenizerCacheDir --if-missing --prefer-modelscope
+}
+$tokenizerPrefetchExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEapTokenizer
+if ($tokenizerPrefetchExit -ne 0) {
+    throw "SDXL tokenizer prefetch failed (exit $tokenizerPrefetchExit)"
+}
+Write-Host "  Cached under tokenizer-cache/ (offline SDXL tokenizer)" -ForegroundColor Green
+
+foreach ($folder in @("openai_clip-vit-large-patch14", "laion_CLIP-ViT-bigG-14-laion2B-39B-b160k")) {
+    foreach ($name in @("vocab.json", "merges.txt", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json")) {
+        $path = Join-Path $tokenizerCacheDir "$folder\$name"
+        if (-not (Test-Path $path)) {
+            throw "SDXL tokenizer cache incomplete after prefetch: $path"
+        }
+    }
+}
+
 # ==== Step 4: Create launcher scripts ====
 
 Write-Host ""
