@@ -68,7 +68,7 @@ from mikazuki.train_log_hub import hub as train_log_hub
 from mikazuki.utils import train_utils
 from mikazuki.utils.config_import import validate_config_import
 from mikazuki.utils.devices import printable_devices
-from mikazuki.portable_utils import flash_attn_stack_usable, is_embedded_python
+from mikazuki.portable_utils import flash_attn_stack_usable
 from mikazuki.utils.tk_window import (open_directory_selector,
                                       open_file_selector,
                                       tkinter_available)
@@ -366,7 +366,7 @@ def should_generate_sample_prompts(config: dict) -> bool:
 
 def _detect_best_attn_mode() -> str:
     """Auto-detect the best available attention backend for Anima training."""
-    if not is_embedded_python() and flash_attn_stack_usable():
+    if flash_attn_stack_usable():
         return "flash"
     try:
         import xformers  # noqa: F401
@@ -553,7 +553,7 @@ def apply_anima_training_defaults(config: dict, model_train_type: str):
                 f"falling back to '{best}'"
             )
     elif requested_attn == "flash":
-        if is_embedded_python() or not flash_attn_stack_usable():
+        if not flash_attn_stack_usable():
             best = _detect_best_attn_mode()
             config["attn_mode"] = best
             log.warning(
