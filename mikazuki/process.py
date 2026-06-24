@@ -90,6 +90,18 @@ def build_accelerate_train_command(
 
     customize_env = os.environ.copy()
     customize_env.update(train_env_overrides())
+    # The training subprocess runs ``python mikazuki/accelerate_launch.py``,
+    # whose entry imports ``mikazuki.china_hub``. Launching by script path puts
+    # only the script's own directory (``mikazuki/``) on sys.path, not the
+    # project root, so portable installs (no editable/site-packages mikazuki)
+    # fail with ``ModuleNotFoundError: No module named 'mikazuki'`` (issue #158).
+    # Inject the project root onto PYTHONPATH so the package is importable.
+    project_root = str(base_dir_path())
+    existing_pythonpath = customize_env.get("PYTHONPATH", "")
+    path_parts = [p for p in existing_pythonpath.split(os.pathsep) if p]
+    if project_root not in path_parts:
+        path_parts.insert(0, project_root)
+    customize_env["PYTHONPATH"] = os.pathsep.join(path_parts)
     customize_env["ACCELERATE_DISABLE_RICH"] = "1"
     customize_env["PYTHONUNBUFFERED"] = "1"
     customize_env["PYTHONWARNINGS"] = "ignore::FutureWarning,ignore::UserWarning"

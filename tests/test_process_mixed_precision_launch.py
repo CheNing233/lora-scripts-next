@@ -68,7 +68,7 @@ def _install_stub_modules() -> None:
     sys.modules["mikazuki.tasks"] = tasks_mod
 
     launch_mod = types.ModuleType("mikazuki.launch_utils")
-    launch_mod.base_dir_path = lambda: "."
+    launch_mod.base_dir_path = lambda: Path("/project/root")
     sys.modules["mikazuki.launch_utils"] = launch_mod
 
     portable_mod = types.ModuleType("mikazuki.portable_utils")
@@ -180,6 +180,41 @@ class BuildAccelerateTrainCommandTests(unittest.TestCase):
         self.assertEqual(env["NO_COLOR"], "1")
         self.assertEqual(env["FORCE_COLOR"], "0")
         self.assertEqual(env["TERM"], "dumb")
+
+    def test_injects_project_root_onto_pythonpath(self):
+        """Regression for #158: accelerate_launch.py imports mikazuki, so the
+        project root must be on PYTHONPATH for portable installs."""
+        with tempfile.TemporaryDirectory() as tmp:
+            toml_path = Path(tmp) / "train.toml"
+            toml_path.write_text('mixed_precision = "bf16"\n', encoding="utf-8")
+            with mock.patch.dict("os.environ", {}, clear=False):
+                import os
+
+                os.environ.pop("PYTHONPATH", None)
+                _args, env, _mp = process.build_accelerate_train_command(
+                    trainer_file="./scripts/stable/train_network.py",
+                    toml_path=str(toml_path),
+                )
+
+        self.assertEqual(env["PYTHONPATH"], str(Path("/project/root")))
+
+    def test_prepends_project_root_preserving_existing_pythonpath(self):
+        import os
+
+        existing = os.pathsep.join(["/already/here", "/second"])
+        with tempfile.TemporaryDirectory() as tmp:
+            toml_path = Path(tmp) / "train.toml"
+            toml_path.write_text('mixed_precision = "bf16"\n', encoding="utf-8")
+            with mock.patch.dict("os.environ", {"PYTHONPATH": existing}, clear=False):
+                _args, env, _mp = process.build_accelerate_train_command(
+                    trainer_file="./scripts/stable/train_network.py",
+                    toml_path=str(toml_path),
+                )
+
+        parts = env["PYTHONPATH"].split(os.pathsep)
+        self.assertEqual(parts[0], str(Path("/project/root")))
+        self.assertIn("/already/here", parts)
+        self.assertIn("/second", parts)
 
 
 if __name__ == "__main__":
