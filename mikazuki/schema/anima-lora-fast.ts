@@ -70,7 +70,7 @@ Schema.intersect([
                 sample_seed: Schema.number().default(42).description("预览图种子"),
                 sample_steps: Schema.number().min(1).max(300).default(40).description("推理步数（Anima 建议 30–50）"),
                 sample_sampler: Schema.union(["euler", "k_euler"]).default("euler").description("Anima 训练预览采样器"),
-                sample_at_first: Schema.boolean().default(false).description("训练开始前生成 step 0 预览图。默认关闭；开启会在训练前额外采样一次并增加显存峰值"),
+                sample_at_first: Schema.boolean().default(true).description("训练开始前生成 step 0 预览图。默认开启，确保启用预览后至少能看到一张图；关闭可省去训练前的一次采样、降低显存峰值"),
                 sample_every_n_epochs: Schema.number().default(2).description("每 N 个 epoch 生成一次预览图"),
             }),
             Schema.object({}),

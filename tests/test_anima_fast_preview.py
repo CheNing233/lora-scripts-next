@@ -75,7 +75,7 @@ class AnimaFastPreviewTests(unittest.TestCase):
             adapted = adapt_config(config, runtime, run_id)
             self.assertIn("sample_prompts", adapted.values)
             self.assertEqual(adapted.values["sample_every_n_epochs"], 1)
-            self.assertFalse(adapted.values["sample_at_first"])
+            self.assertTrue(adapted.values["sample_at_first"])
             self.assertNotIn("enable_preview", adapted.values)
             self.assertNotIn("positive_prompts", adapted.values)
 
@@ -180,7 +180,7 @@ class AnimaFastPreviewTests(unittest.TestCase):
         }
         warnings = apply_anima_fast_preview(config, "/tmp/autosave", "run-clamp")
         self.assertEqual(config["sample_every_n_epochs"], 1)
-        self.assertFalse(config.get("sample_at_first"))
+        self.assertTrue(config.get("sample_at_first"))
         self.assertTrue(any("sample_every_n_epochs" in item for item in warnings))
 
     def test_sample_every_n_epochs_unchanged_when_within_max_epochs(self):
@@ -213,6 +213,31 @@ class AnimaFastPreviewTests(unittest.TestCase):
         }
         apply_anima_fast_preview(config, "/tmp/autosave", "run-default")
         self.assertEqual(config["sample_every_n_epochs"], 1)
+
+    def test_sample_at_first_defaults_true_so_preview_always_fires(self):
+        """Regression for #126: preview enabled must produce at least one image.
+
+        7cb49dc flipped the implicit sample_at_first default to False, so short
+        or epoch-clamped runs could finish without ever sampling. Default back
+        to True when the user did not set it explicitly.
+        """
+        config = {
+            "enable_preview": True,
+            "max_train_epochs": 1,
+            "positive_prompts": "1girl",
+        }
+        apply_anima_fast_preview(config, "/tmp/autosave", "run-at-first")
+        self.assertTrue(config["sample_at_first"])
+
+    def test_explicit_sample_at_first_false_is_preserved(self):
+        config = {
+            "enable_preview": True,
+            "max_train_epochs": 4,
+            "positive_prompts": "1girl",
+            "sample_at_first": False,
+        }
+        apply_anima_fast_preview(config, "/tmp/autosave", "run-explicit-false")
+        self.assertFalse(config["sample_at_first"])
 
 
 if __name__ == "__main__":
