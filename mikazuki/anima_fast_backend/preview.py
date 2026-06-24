@@ -143,7 +143,11 @@ def apply_anima_fast_preview(config: dict, autosave_dir: str, run_id: str) -> li
         config["sample_prompts"] = str(out_path.resolve())
 
     if config.get("sample_at_first") is None:
-        config["sample_at_first"] = False
+        # Default to sampling once at training start so an enabled preview
+        # always produces at least one image, even for short/epoch-clamped runs
+        # (regression from 7cb49dc, reported in #126). Users can still set it
+        # to False explicitly to skip the step-0 sample and lower VRAM peak.
+        config["sample_at_first"] = True
     _normalize_sample_schedule(config, warnings)
     config.setdefault("sample_sampler", "euler")
 
