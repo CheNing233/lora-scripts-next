@@ -29,7 +29,7 @@ class AnimaTrainingDefaultsTests(unittest.TestCase):
         self.assertNotIn("full_bf16", config)
         self.assertEqual(config["unet_lr"], 5e-5)
 
-    def test_anima_auto_enables_full_bf16_for_lokr_bf16(self):
+    def test_anima_lokr_bf16_warns_without_changing_full_precision(self):
         config = {
             "mixed_precision": "bf16",
             "optimizer_type": "AdamW8bit",
@@ -41,10 +41,10 @@ class AnimaTrainingDefaultsTests(unittest.TestCase):
 
         apply_anima_training_defaults(config, "anima-lora")
 
-        self.assertTrue(config.get("full_bf16"))
-        self.assertIn("Enabled full_bf16 for Anima LoKr", config["_training_warnings"][0])
+        self.assertNotIn("full_bf16", config)
+        self.assertIn("may require full_bf16=true", config["_training_warnings"][0])
 
-    def test_anima_lokr_full_matrix_uses_conservative_guardrails(self):
+    def test_anima_lokr_full_matrix_warns_without_changing_user_params(self):
         config = {
             "mixed_precision": "bf16",
             "full_bf16": True,
@@ -57,8 +57,8 @@ class AnimaTrainingDefaultsTests(unittest.TestCase):
 
         apply_anima_training_defaults(config, "anima-lora")
 
-        self.assertNotIn("full_bf16", config)
-        self.assertEqual(config["scale_weight_norms"], 1)
+        self.assertTrue(config["full_bf16"])
+        self.assertNotIn("scale_weight_norms", config)
         self.assertIn("full_matrix=true", config["_training_warnings"][0])
 
     def test_anima_disables_full_bf16_for_came(self):
@@ -92,7 +92,7 @@ class AnimaTrainingDefaultsTests(unittest.TestCase):
 
         self.assertEqual(config["mixed_precision"], "bf16")
         self.assertNotIn("full_fp16", config)
-        self.assertEqual(config["scale_weight_norms"], 1)
+        self.assertNotIn("scale_weight_norms", config)
         self.assertTrue(
             any("full_matrix=true" in warning for warning in config["_training_warnings"])
         )
