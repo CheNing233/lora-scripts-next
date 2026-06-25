@@ -1,6 +1,8 @@
 
 import asyncio
+import importlib.util
 import os
+import site
 import sys
 import webbrowser
 import uuid
@@ -61,6 +63,38 @@ def read_mixed_precision_from_train_toml(toml_path: str) -> Optional[str]:
     return normalize_mixed_precision(data.get("mixed_precision"))
 
 
+def _path_is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def _module_origin_under_user_site(module_name: str) -> bool:
+    try:
+        user_site = Path(site.getusersitepackages())
+    except (AttributeError, TypeError):
+        return False
+
+    spec = importlib.util.find_spec(module_name)
+    if spec is None:
+        return False
+
+    candidates: list[str] = []
+    if spec.origin:
+        candidates.append(spec.origin)
+    if spec.submodule_search_locations:
+        candidates.extend(str(location) for location in spec.submodule_search_locations)
+
+    return any(_path_is_relative_to(Path(candidate), user_site) for candidate in candidates)
+
+
+def _should_disable_user_site() -> bool:
+    """Keep portable isolation unless training deps are installed in user site."""
+    return not any(_module_origin_under_user_site(name) for name in ("torch", "accelerate"))
+
+
 def build_accelerate_train_command(
     *,
     trainer_file: str,
@@ -105,7 +139,10 @@ def build_accelerate_train_command(
     customize_env["ACCELERATE_DISABLE_RICH"] = "1"
     customize_env["PYTHONUNBUFFERED"] = "1"
     customize_env["PYTHONWARNINGS"] = "ignore::FutureWarning,ignore::UserWarning"
-    customize_env["PYTHONNOUSERSITE"] = "1"
+    if _should_disable_user_site():
+        customize_env["PYTHONNOUSERSITE"] = "1"
+    else:
+        customize_env.pop("PYTHONNOUSERSITE", None)
     customize_env["NO_COLOR"] = "1"
     customize_env["FORCE_COLOR"] = "0"
     customize_env["TERM"] = "dumb"

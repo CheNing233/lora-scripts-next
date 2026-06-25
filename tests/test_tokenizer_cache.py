@@ -102,10 +102,11 @@ def test_apply_tokenizer_cache_dir_injects_for_flux_lora(tmp_path: Path, monkeyp
     assert config["tokenizer_cache_dir"] == str(root).replace("\\", "/")
 
 
-def test_build_accelerate_train_command_uses_mirror_launch_entry():
-    from mikazuki.process import build_accelerate_train_command
+def test_build_accelerate_train_command_uses_mirror_launch_entry(monkeypatch):
+    from mikazuki import process
 
-    args, env, _ = build_accelerate_train_command(
+    monkeypatch.setattr(process, "_module_origin_under_user_site", lambda _name: False)
+    args, env, _ = process.build_accelerate_train_command(
         trainer_file="./vendor/sd-scripts/sdxl_train_network.py",
         toml_path="config/autosave/test.toml",
     )

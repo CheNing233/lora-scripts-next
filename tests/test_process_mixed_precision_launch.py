@@ -99,6 +99,8 @@ def _install_stub_modules() -> None:
     resolver_mod.default_resolver = mock.MagicMock()
     sys.modules["mikazuki.anima_fast_backend.service_resolver"] = resolver_mod
 
+    sys.modules.pop("mikazuki.process", None)
+
 
 # Install stubs only long enough to import ``mikazuki.process``; the imported
 # module keeps its own references to whatever it pulled in, so we restore
@@ -180,6 +182,33 @@ class BuildAccelerateTrainCommandTests(unittest.TestCase):
         self.assertEqual(env["NO_COLOR"], "1")
         self.assertEqual(env["FORCE_COLOR"], "0")
         self.assertEqual(env["TERM"], "dumb")
+
+    def test_disables_user_site_when_training_deps_do_not_need_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            toml_path = Path(tmp) / "train.toml"
+            toml_path.write_text('mixed_precision = "bf16"\n', encoding="utf-8")
+            with mock.patch.object(process, "_module_origin_under_user_site", return_value=False):
+                _args, env, _mp = process.build_accelerate_train_command(
+                    trainer_file="./scripts/stable/train_network.py",
+                    toml_path=str(toml_path),
+                )
+
+        self.assertEqual(env["PYTHONNOUSERSITE"], "1")
+
+    def test_allows_user_site_when_torch_is_installed_there(self):
+        def _under_user_site(name: str) -> bool:
+            return name == "torch"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            toml_path = Path(tmp) / "train.toml"
+            toml_path.write_text('mixed_precision = "bf16"\n', encoding="utf-8")
+            with mock.patch.object(process, "_module_origin_under_user_site", side_effect=_under_user_site):
+                _args, env, _mp = process.build_accelerate_train_command(
+                    trainer_file="./scripts/stable/train_network.py",
+                    toml_path=str(toml_path),
+                )
+
+        self.assertNotIn("PYTHONNOUSERSITE", env)
 
     def test_injects_project_root_onto_pythonpath(self):
         """Regression for #158: accelerate_launch.py imports mikazuki, so the
