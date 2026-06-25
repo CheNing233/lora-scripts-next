@@ -197,14 +197,15 @@ LOKR_TRAIN_NORM_WARNING = (
     "LyCORIS train_norm is disabled for Anima LoKr because LyCORIS NormModule "
     "can crash on Anima norm layers without affine weights during preview sampling."
 )
-LOKR_BF16_WEIGHT_DECOMPOSITION_WARNING = (
-    "LyCORIS LoKr weight decomposition is disabled for Anima mixed_precision=bf16 "
-    "because some LyCORIS versions keep an unsafe dtype conversion path for "
-    "dora_wd/weight_decomposition."
+LOKR_BF16_DORA_WARNING = (
+    "Anima LoKr mixed_precision=bf16 with DoRA/weight_decomposition can be less "
+    "stable on some LyCORIS/PyTorch combinations. The trainer keeps your "
+    "dora_wd/weight_decomposition settings unchanged."
 )
 LOKR_FULL_MATRIX_WARNING = (
-    "Anima LoKr full_matrix=true uses conservative stability guardrails: "
-    "trainable adapter weights stay fp32 and scale_weight_norms defaults to 1."
+    "Anima LoKr full_matrix=true is a high-risk stability mode. Consider "
+    "disabling full_bf16/full_fp16 and setting scale_weight_norms=1 if the first "
+    "epoch becomes unstable. The trainer keeps your parameters unchanged."
 )
 
 
@@ -304,16 +305,6 @@ def _strip_arg(network_args: list[str], arg_key: str) -> tuple[list[str], bool]:
     return stripped, removed
 
 
-def _strip_args(network_args: list[str], arg_keys: set[str]) -> tuple[list[str], list[str]]:
-    stripped = list(network_args)
-    removed: list[str] = []
-    for arg_key in arg_keys:
-        stripped, did_remove = _strip_arg(stripped, arg_key)
-        if did_remove:
-            removed.append(arg_key)
-    return stripped, removed
-
-
 def adapt_anima_config(
     config: dict[str, Any], *, finetune: bool = False
 ) -> tuple[dict[str, Any], list[str]]:
@@ -375,23 +366,15 @@ def adapt_anima_config(
             if removed_train_norm:
                 warnings.append(LOKR_TRAIN_NORM_WARNING)
             if _network_args_has_truthy_arg(network_args, "full_matrix"):
-                disabled = []
-                for precision_key in ("full_bf16", "full_fp16"):
-                    if source.pop(precision_key, None):
-                        disabled.append(precision_key)
-                if _is_empty_value(source.get("scale_weight_norms")):
-                    source["scale_weight_norms"] = 1
-                if disabled:
-                    warnings.append(
-                        f"{LOKR_FULL_MATRIX_WARNING} Disabled full half precision: {', '.join(disabled)}"
-                    )
-            if str(source.get("mixed_precision", "")).strip().lower() == "bf16":
-                network_args, removed_weight_decomposition = _strip_args(
-                    network_args,
-                    {"dora_wd", "weight_decomposition"},
+                warnings.append(LOKR_FULL_MATRIX_WARNING)
+            if (
+                str(source.get("mixed_precision", "")).strip().lower() == "bf16"
+                and (
+                    _network_args_has_truthy_arg(network_args, "dora_wd")
+                    or _network_args_has_truthy_arg(network_args, "weight_decomposition")
                 )
-                if removed_weight_decomposition:
-                    warnings.append(LOKR_BF16_WEIGHT_DECOMPOSITION_WARNING)
+            ):
+                warnings.append(LOKR_BF16_DORA_WARNING)
         if network_args:
             source["network_args"] = network_args
 

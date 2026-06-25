@@ -430,6 +430,45 @@ def _anima_lokr_full_matrix_training(config: dict) -> bool:
     return False
 
 
+def _warn_lokr_precision_risks(config: dict) -> None:
+    if not _anima_lokr_training(config):
+        return
+
+    mixed = str(config.get("mixed_precision", "")).strip().lower()
+    full_key = "full_bf16" if mixed == "bf16" else "full_fp16" if mixed == "fp16" else None
+    if full_key and not config.get(full_key):
+        _add_training_warning(
+            config,
+            f"Anima LoKr mixed_precision={mixed} may require {full_key}=true to keep "
+            "adapter and activation dtypes aligned. The trainer keeps your precision "
+            "settings unchanged.",
+        )
+        log.warning(
+            "Anima LoKr mixed_precision=%s may require %s=true to keep adapter and "
+            "activation dtypes aligned. User precision settings are unchanged.",
+            mixed,
+            full_key,
+        )
+
+    if _anima_lokr_full_matrix_training(config):
+        active_full_half = [
+            key
+            for key in ("full_bf16", "full_fp16")
+            if config.get(key)
+        ]
+        if active_full_half or _is_invalid_value(config.get("scale_weight_norms")):
+            _add_training_warning(
+                config,
+                "Anima LoKr full_matrix=true is a high-risk stability mode. "
+                "Consider disabling full_bf16/full_fp16 and setting scale_weight_norms=1 "
+                "if the first epoch becomes unstable. The trainer keeps your parameters unchanged.",
+            )
+            log.warning(
+                "Anima LoKr full_matrix=true is a high-risk stability mode. "
+                "User full precision and scale_weight_norms settings are unchanged."
+            )
+
+
 def apply_anima_training_defaults(config: dict, model_train_type: str):
     if model_train_type not in ANIMA_TRAIN_TYPES:
         return
@@ -482,60 +521,11 @@ def apply_anima_training_defaults(config: dict, model_train_type: str):
                 f"{config.get('optimizer_type')} ({', '.join(disabled)}). "
                 "This keeps trainable LoRA weights in fp32 to reduce loss=nan risk."
             )
-        if _anima_lokr_full_matrix_training(config):
-            had_scale_guardrail = not _is_invalid_value(config.get("scale_weight_norms"))
-            if _is_invalid_value(config.get("scale_weight_norms")):
-                config["scale_weight_norms"] = 1
-            if disabled or not had_scale_guardrail:
-                _add_training_warning(
-                    config,
-                    "Anima LoKr full_matrix=true uses conservative stability guardrails: "
-                    "trainable adapter weights stay fp32 and scale_weight_norms defaults to 1. "
-                    f"Disabled full half precision: {', '.join(disabled) if disabled else 'none'}",
-                )
-                log.warning(
-                    "Anima LoKr full_matrix=true uses conservative stability guardrails: "
-                    "trainable adapter weights stay fp32 and scale_weight_norms defaults to 1. "
-                    "Disabled full half precision: %s",
-                    ", ".join(disabled) if disabled else "none",
-                )
+        _warn_lokr_precision_risks(config)
     elif _anima_lokr_full_matrix_training(config):
-        disabled = []
-        for key in ("full_bf16", "full_fp16"):
-            if config.pop(key, None):
-                disabled.append(key)
-        if _is_invalid_value(config.get("scale_weight_norms")):
-            config["scale_weight_norms"] = 1
-        _add_training_warning(
-            config,
-            "Anima LoKr full_matrix=true uses conservative stability guardrails: "
-            "trainable adapter weights stay fp32 and scale_weight_norms defaults to 1. "
-            f"Disabled full half precision: {', '.join(disabled) if disabled else 'none'}",
-        )
-        log.warning(
-            "Anima LoKr full_matrix=true uses conservative stability guardrails: "
-            "trainable adapter weights stay fp32 and scale_weight_norms defaults to 1. "
-            "Disabled full half precision: %s",
-            ", ".join(disabled) if disabled else "none",
-        )
+        _warn_lokr_precision_risks(config)
     elif _anima_lokr_training(config):
-        # LyCORIS LoKr can hit dtype mismatch under mixed precision when adapter
-        # params stay fp32 while activations are bf16/fp16.
-        mixed = str(config.get("mixed_precision", "")).strip().lower()
-        full_key = "full_bf16" if mixed == "bf16" else "full_fp16" if mixed == "fp16" else None
-        if full_key and not config.get(full_key):
-            config[full_key] = True
-            _add_training_warning(
-                config,
-                f"Enabled {full_key} for Anima LoKr mixed_precision={mixed} to keep "
-                "adapter and activation dtypes aligned.",
-            )
-            log.info(
-                "Enabled %s for Anima LoKr mixed_precision=%s to keep adapter and "
-                "activation dtypes aligned.",
-                full_key,
-                mixed,
-            )
+        _warn_lokr_precision_risks(config)
 
     requested_attn = config.get("attn_mode", "")
     if not requested_attn:
