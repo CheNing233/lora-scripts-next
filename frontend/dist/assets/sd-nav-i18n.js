@@ -323,23 +323,14 @@
     const legacy =
       sidebar.querySelector('a[href="/tageditor.md"]') ||
       sidebar.querySelector('a[href="/tageditor.html"]');
-    if (!legacy) return;
-    setSidebarAnchorLabel(legacy, "经典标签编辑");
-
-    let native = sidebar.querySelector('a[href="/native-tageditor.html"]');
-    if (!native) {
-      const li = document.createElement("li");
-      native = document.createElement("a");
-      native.href = "/native-tageditor.html";
-      native.className = "sidebar-item sidebar-heading";
-      li.appendChild(native);
-      legacy.closest("li")?.after(li);
+    const native = sidebar.querySelector('a[href="/native-tageditor.html"]');
+    native?.closest("li")?.remove();
+    if (legacy) {
+      setSidebarAnchorLabel(legacy, "经典标签编辑");
+      if (location.pathname === "/native-tageditor.html") {
+        legacy.classList.remove("active");
+      }
     }
-    if (location.pathname === "/native-tageditor.html") {
-      native.classList.add("active");
-      legacy.classList.remove("active");
-    }
-    setSidebarAnchorLabel(native, "原生标签编辑");
   }
 
   function ensureTerminalStyle() {

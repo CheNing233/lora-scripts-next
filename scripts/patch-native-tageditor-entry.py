@@ -106,33 +106,15 @@ def patch_sidebar_html(html: str, active_native: bool) -> str:
         html,
     )
 
-    if native_href not in html:
-        native_class = (
-            "sidebar-item sidebar-heading active"
-            if active_native
-            else "sidebar-item sidebar-heading"
-        )
-        native_item = (
-            f'<li><a href="{native_href}" class="{native_class}" aria-label="{NATIVE_LABEL}">'
-            f"<!--[--><!--]--> {NATIVE_LABEL} <!--[--><!--]--></a><!----><!----></li>"
-        )
-        html = re.sub(
-            r'(<li><a href="/tageditor\.md" class="sidebar-item sidebar-heading(?: active)?" '
-            rf'aria-label="{LEGACY_LABEL}">.*?</li>)',
-            r"\1" + native_item,
-            html,
-            count=1,
-        )
-    else:
-        html = re.sub(
-            r'(<a href="/native-tageditor\.html" class="sidebar-item sidebar-heading)( active)?(" aria-label=")[^"]*(">)'
-            r"(?:<!--\[--><!--\]--> )?[^<]*( <!--\[--><!--\]--></a>)",
-            lambda m: (
-                f"{m.group(1)}{' active' if active_native else ''}{m.group(3)}{NATIVE_LABEL}{m.group(4)}"
-                f"<!--[--><!--]--> {NATIVE_LABEL}{m.group(5)}"
-            ),
-            html,
-        )
+    # Keep /native-tageditor.html available for direct testing, but do not expose
+    # the experimental editor in the default sidebar until it is stable enough.
+    html = re.sub(
+        r'<li><a href="/native-tageditor\.html" class="sidebar-item sidebar-heading(?: active)?" '
+        r'aria-label="[^"]*">.*?</li>',
+        "",
+        html,
+        count=1,
+    )
     return html
 
 
@@ -255,8 +237,10 @@ def patch_app_js() -> None:
             raise RuntimeError("legacy tageditor route not found in app.js")
         js = js.replace(legacy_route, legacy_route + "," + native_route, 1)
 
-    # Keep the runtime sidebar aligned with the static snapshots.
-    replacement = f'{{"text":"{LEGACY_LABEL}","link":"/tageditor.md"}},{{"text":"{NATIVE_LABEL}","link":"/native-tageditor.html"}}'
+    # Keep the runtime sidebar aligned with the static snapshots. Native editor
+    # routing remains available, but the default sidebar only exposes the
+    # stable legacy editor.
+    replacement = f'{{"text":"{LEGACY_LABEL}","link":"/tageditor.md"}}'
     js = js.replace(
         f'{{"text":"{ORIGINAL_LABEL}","link":"/tageditor.md"}}', replacement
     )
@@ -311,7 +295,7 @@ def assert_split() -> None:
         "v-native-tageditor" in app,
         NATIVE_PAGE_JS.name in app,
         "/native-tageditor.html" in app,
-        'href="/native-tageditor.html"' in native,
+        'href="/native-tageditor.html"' not in native,
         "theme-default-content sd-native-editor-content" in NATIVE_PAGE_JS.read_text(encoding="utf-8"),
         APP_JS_VERSIONED_URL in native,
     ]

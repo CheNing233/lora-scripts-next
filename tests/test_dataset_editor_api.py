@@ -324,9 +324,9 @@ def test_native_tageditor_embeds_native_editor_in_trainer_shell():
     assert 'name="sd-dataset-editor-script"' in response.text
     assert 'src="/assets/app.547295de.js?v=' in response.text
     assert 'href="/tageditor.md"' in response.text
-    assert 'href="/native-tageditor.html"' in response.text
+    assert 'href="/native-tageditor.html"' not in response.text
     assert "经典标签编辑" in response.text
-    assert "原生标签编辑" in response.text
+    assert "原生标签编辑" not in response.text
 
 
 def test_native_tageditor_uses_native_vuepress_page_data():
@@ -364,6 +364,7 @@ def test_native_tageditor_uses_native_vuepress_page_data():
         '["v-native-tageditor","/native-tageditor.html",{title:"原生标签编辑"}'
         in app_bundle
     )
+    assert '{"text":"原生标签编辑","link":"/native-tageditor.html"}' not in app_bundle
     assert (
         'rel="modulepreload" href="/assets/tageditor.html.66da263e.js"'
         not in native_tageditor
@@ -655,16 +656,17 @@ def test_dataset_editor_hides_quick_tags_but_keeps_tag_filter():
     assert 'id="tag-list"' in entry
 
 
-def test_nav_i18n_keeps_native_tag_editor_entry_distinct():
+def test_nav_i18n_hides_native_tag_editor_entry_by_default():
     script = (ROOT / "frontend" / "dist" / "assets" / "sd-nav-i18n.js").read_text(
         encoding="utf-8"
     )
 
     assert "function ensureTagEditorLinks()" in script
     assert "经典标签编辑" in script
-    assert "原生标签编辑" in script
     assert "textNodes.slice(1).forEach" in script
-    assert 'native.href = "/native-tageditor.html"' in script
+    assert 'native.href = "/native-tageditor.html"' not in script
+    assert 'querySelector(\'a[href="/native-tageditor.html"]\')' in script
+    assert 'native?.closest("li")?.remove();' in script
     assert "ensureTagEditorLinks();" in script
 
 
