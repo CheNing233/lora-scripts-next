@@ -57,13 +57,7 @@
       const t = (b.textContent || "").trim();
       if (
         t === "开始训练" ||
-        t === "✨加载训练预设✨" ||
-        t === "导入配置文件" ||
-        t === "保存参数" ||
-        t === "Start training" ||
-        t === "Load training preset" ||
-        t === "Import config" ||
-        t === "Save parameters"
+        t === "Start training"
       ) {
         b.disabled = kill || !ready;
         b.setAttribute("aria-disabled", b.disabled ? "true" : "false");
