@@ -354,6 +354,9 @@ def test_native_tageditor_uses_native_vuepress_page_data():
     assert parsed_page_data["title"] == "原生标签编辑"
     assert parsed_page_data["frontmatter"] == {}
     assert parsed_page_data["frontmatter"].get("type") != "iframe"
+    page_component = native_page_component.read_text(encoding="utf-8")
+    assert 'class:"theme-default-content sd-native-editor-content"' in page_component
+    assert 'r("div")' not in page_component
     assert '"v-native-tageditor":()=>wt(()=>import("./native-tageditor.html.native.js?v=' in app_bundle
     assert '"v-native-tageditor":Jt(()=>wt(()=>import("./native-tageditor.html.page.js?v=' in app_bundle
     assert app_bundle.count('["v-native-tageditor","/native-tageditor.html"') == 1
@@ -384,6 +387,7 @@ def test_tageditor_embeds_native_editor_in_trainer_shell():
     assert "打开内置编辑器" not in script
     assert "/proxy/tageditor/" not in script
     assert 'document.getElementById("sd-native-editor-entry")' in script
+    assert 'querySelector(".sd-native-editor-content")' in script
     assert "initializeMountedEditor()" in script
     assert "window.sdDatasetEditor?.init?.()" in script
     assert "observer.disconnect()" not in script

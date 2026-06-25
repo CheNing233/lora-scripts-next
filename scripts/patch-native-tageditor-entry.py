@@ -157,7 +157,7 @@ def write_native_data() -> None:
 def write_native_page_component() -> None:
     NATIVE_PAGE_JS.write_text(
         'import{_ as e,o as t,c as r}from"./app.547295de.js?v=20260604-native-tageditor-2";'
-        'const c={};function o(_,a){return t(),r("div")}'
+        'const c={};function o(_,a){return t(),r("div",{class:"theme-default-content sd-native-editor-content"})}'
         'var s=e(c,[["render",o],["__file","native-tageditor.html.vue"]]);'
         "export{s as default};\n",
         encoding="utf-8",
@@ -312,6 +312,7 @@ def assert_split() -> None:
         NATIVE_PAGE_JS.name in app,
         "/native-tageditor.html" in app,
         'href="/native-tageditor.html"' in native,
+        "theme-default-content sd-native-editor-content" in NATIVE_PAGE_JS.read_text(encoding="utf-8"),
         APP_JS_VERSIONED_URL in native,
     ]
     if not all(checks):

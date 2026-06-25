@@ -144,8 +144,14 @@
   }
 
   function mountEditor() {
-    if (document.getElementById("sd-native-editor-entry")) return true;
-    const content = document.querySelector(".theme-default-content");
+    const existing = document.getElementById("sd-native-editor-entry");
+    if (existing) {
+      if (!existing.querySelector(".de-shell")) {
+        existing.innerHTML = editorMarkup();
+      }
+      return true;
+    }
+    const content = document.querySelector(".theme-default-content") || document.querySelector(".sd-native-editor-content");
     const theme = document.querySelector(".theme-container");
     const container = content || theme;
     if (!container) return false;
