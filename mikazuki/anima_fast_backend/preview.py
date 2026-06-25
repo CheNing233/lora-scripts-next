@@ -6,7 +6,10 @@ import os
 import random
 
 from .adapter import AdapterError, int_value, is_empty
-from mikazuki.utils.train_utils import build_sample_prompt_line as build_kohya_sample_prompt_line
+from mikazuki.utils.train_utils import (
+    build_sample_prompt_line as build_kohya_sample_prompt_line,
+    is_preview_enabled as shared_is_preview_enabled,
+)
 
 DEFAULT_SAMPLE_POSITIVE = (
     "1girl, solo, smile, japanese clothes, kimono, blue eyes, closed mouth, upper body, looki"
@@ -22,14 +25,7 @@ DEFAULT_SAMPLE_NEGATIVE = (
 
 
 def is_preview_enabled(config: dict) -> bool:
-    raw = config.get("enable_preview")
-    if raw in (True, "true", "True", "1", 1):
-        return True
-    if raw in (False, "false", "False", "0", 0):
-        return False
-    if not is_empty(config.get("prompt_file")) or not is_empty(config.get("sample_prompts")):
-        return True
-    return False
+    return shared_is_preview_enabled(config) or not is_empty(config.get("prompt_file"))
 
 
 def _strip_preview_fields(config: dict) -> None:

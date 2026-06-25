@@ -36,12 +36,13 @@ class AnimaFastPreviewTests(unittest.TestCase):
     def test_preview_disabled_strips_sample_fields(self):
         config = {
             "enable_preview": False,
-            "sample_prompts": "./prompts.txt",
             "sample_at_first": True,
+            "sample_sampler": "euler",
         }
         warnings = apply_anima_fast_preview(config, "/tmp/autosave", "run-1")
         self.assertEqual(warnings, [])
         self.assertNotIn("sample_prompts", config)
+        self.assertNotIn("sample_sampler", config)
 
     def test_preview_enabled_writes_prompt_file_and_adapts(self):
         with tempfile.TemporaryDirectory() as td:
@@ -107,19 +108,38 @@ class AnimaFastPreviewTests(unittest.TestCase):
 
     def test_prompt_defaults_do_not_enable_preview_without_enable_preview_flag(self):
         config = {
-            "sample_every_n_epochs": 2,
-            "positive_prompts": "1girl, solo",
+            "sample_sampler": "euler",
+            "sample_at_first": True,
         }
         self.assertFalse(is_preview_enabled(config))
+
+    def test_strict_preview_signals_enable_preview_without_enable_preview_flag(self):
+        for key, value in (
+            ("sample_prompts", "./prompts.txt"),
+            ("positive_prompts", "1girl, solo"),
+            ("negative_prompts", "lowres"),
+            ("sample_every_n_epochs", 1),
+            ("sample_every_n_steps", 10),
+        ):
+            with self.subTest(key=key):
+                self.assertTrue(is_preview_enabled({key: value}))
 
     def test_explicit_prompt_file_enables_preview_without_enable_preview_flag(self):
         self.assertTrue(is_preview_enabled({"sample_prompts": "./prompts.txt"}))
 
-    def test_preview_disabled_when_enable_preview_false_even_with_prompt_fields(self):
+    def test_preview_false_recovers_when_strict_signal_fields_are_present(self):
         config = {
             "enable_preview": False,
             "positive_prompts": "1girl, solo",
             "sample_every_n_epochs": 2,
+        }
+        self.assertTrue(is_preview_enabled(config))
+
+    def test_preview_false_preserved_without_strict_signal_fields(self):
+        config = {
+            "enable_preview": False,
+            "sample_sampler": "euler",
+            "sample_at_first": True,
         }
         self.assertFalse(is_preview_enabled(config))
 
@@ -143,7 +163,7 @@ class AnimaFastPreviewTests(unittest.TestCase):
             self.assertNotIn("sample_sampler", dumped)
             self.assertNotIn("sample_prompts", dumped)
 
-    def test_frontend_payload_without_enable_preview_does_not_generate_sample_prompts(self):
+    def test_frontend_payload_without_enable_preview_generates_sample_prompts_from_signals(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             runtime = make_runtime(root)
@@ -164,8 +184,8 @@ class AnimaFastPreviewTests(unittest.TestCase):
             apply_anima_fast_preview(config, str(root / "autosave"), "run-fe")
             adapted = adapt_config(config, runtime, "run-fe")
             dumped = dump_flat_toml(adapted.values)
-            self.assertNotIn("sample_prompts", dumped)
-            self.assertNotIn("sample_at_first", dumped)
+            self.assertIn("sample_prompts", dumped)
+            self.assertIn("sample_at_first = true", dumped)
 
     def test_is_preview_enabled_accepts_string_true(self):
         self.assertTrue(is_preview_enabled({"enable_preview": "true"}))

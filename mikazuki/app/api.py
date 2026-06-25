@@ -659,6 +659,7 @@ async def create_toml_file(request: Request):
     config: dict = json.loads(json_data.decode("utf-8"))
     train_utils.fix_config_types(config)
     normalize_custom_args(config)
+    train_utils.ensure_enable_preview_flag(config)
 
     gpu_ids = config.pop("gpu_ids", None)
 
