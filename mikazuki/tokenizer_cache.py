@@ -23,9 +23,12 @@ CLIP_TOKENIZER_FILES = (
 
 T5_TOKENIZER_FILES = (
     "spiece.model",
-    "tokenizer.json",
     "tokenizer_config.json",
     "special_tokens_map.json",
+)
+
+T5_OPTIONAL_TOKENIZER_FILES = (
+    "tokenizer.json",
 )
 
 # Back-compat alias used by prefetch / build scripts.
@@ -35,6 +38,10 @@ TOKENIZER_FILES_BY_REPO: dict[str, tuple[str, ...]] = {
     CLIP_L_TOKENIZER_HF_ID: CLIP_TOKENIZER_FILES,
     SDXL_TOKENIZER2_HF_ID: CLIP_TOKENIZER_FILES,
     FLUX_T5_TOKENIZER_HF_ID: T5_TOKENIZER_FILES,
+}
+
+OPTIONAL_TOKENIZER_FILES_BY_REPO: dict[str, tuple[str, ...]] = {
+    FLUX_T5_TOKENIZER_HF_ID: T5_OPTIONAL_TOKENIZER_FILES,
 }
 
 # Hugging Face repo id -> local cache folder name under tokenizer-cache/

@@ -18,6 +18,7 @@ from mikazuki.china_hub import HF_TO_MODELSCOPE_REPOS  # noqa: E402
 from mikazuki.tokenizer_cache import (  # noqa: E402
     BUNDLED_TOKENIZER_DIRS,
     DEFAULT_TOKENIZER_CACHE_DIRNAME,
+    OPTIONAL_TOKENIZER_FILES_BY_REPO,
     TOKENIZER_FILES_BY_REPO,
     is_tokenizer_bundle_complete,
     required_tokenizer_files,
@@ -25,6 +26,7 @@ from mikazuki.tokenizer_cache import (  # noqa: E402
 )
 
 MODELSCOPE_TOKENIZER_REPOS = HF_TO_MODELSCOPE_REPOS
+HF_OFFICIAL_ENDPOINT = "https://huggingface.co"
 
 
 def _resolve_cache_root(explicit: str | None) -> Path:
@@ -78,11 +80,15 @@ def _download_tokenizer_file(
         except Exception as exc:
             errors.append(f"modelscope: {exc}")
 
-    try:
-        _download_via_http(hf_repo_id, filename, dest, endpoint=hf_endpoint)
-        return
-    except Exception as exc:
-        errors.append(f"http({hf_endpoint}): {exc}")
+    http_endpoints = [hf_endpoint]
+    if hf_endpoint.rstrip("/") != HF_OFFICIAL_ENDPOINT:
+        http_endpoints.append(HF_OFFICIAL_ENDPOINT)
+    for endpoint in http_endpoints:
+        try:
+            _download_via_http(hf_repo_id, filename, dest, endpoint=endpoint)
+            return
+        except Exception as exc:
+            errors.append(f"http({endpoint}): {exc}")
 
     if not prefer_modelscope:
         try:
@@ -92,6 +98,10 @@ def _download_tokenizer_file(
             errors.append(f"modelscope: {exc}")
 
     raise RuntimeError(f"failed to download {hf_repo_id}/{filename}: {'; '.join(errors)}")
+
+
+def _optional_tokenizer_files(hf_repo_id: str) -> tuple[str, ...]:
+    return OPTIONAL_TOKENIZER_FILES_BY_REPO.get(hf_repo_id, ())
 
 
 def ensure_sdxl_tokenizer_cache(
@@ -124,6 +134,21 @@ def ensure_sdxl_tokenizer_cache(
                 prefer_modelscope=prefer_modelscope,
                 hf_endpoint=hf_endpoint,
             )
+        for filename in _optional_tokenizer_files(hf_repo_id):
+            dest = local_dir / filename
+            if not force and dest.is_file():
+                continue
+            print(f"Downloading optional {hf_repo_id}/{filename} -> {dest}")
+            try:
+                _download_tokenizer_file(
+                    hf_repo_id,
+                    filename,
+                    dest,
+                    prefer_modelscope=prefer_modelscope,
+                    hf_endpoint=hf_endpoint,
+                )
+            except Exception as exc:
+                print(f"WARNING: optional tokenizer file skipped: {hf_repo_id}/{filename}: {exc}", file=sys.stderr)
 
     if not is_tokenizer_bundle_complete(cache_root, repo_ids):
         raise RuntimeError(f"tokenizer cache incomplete after prefetch: {cache_root}")
