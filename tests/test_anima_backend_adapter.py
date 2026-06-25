@@ -208,6 +208,59 @@ class AnimaBackendAdapterTests(unittest.TestCase):
         self.assertNotIn("train_norm=True", adapted["network_args"])
         self.assertTrue(any("train_norm" in warning and "LoKr" in warning for warning in warnings))
 
+    def test_lokr_bf16_disables_weight_decomposition_args(self):
+        config = {
+            "network_module": "lycoris.kohya",
+            "lycoris_algo": "lokr",
+            "mixed_precision": "bf16",
+            "full_bf16": True,
+            "full_matrix": True,
+            "dora_wd": True,
+            "network_args": ["factor=-1", "weight_decomposition=True"],
+        }
+
+        adapted, warnings = adapt_anima_config(config)
+
+        self.assertIn("network_args", adapted)
+        self.assertIn("algo=lokr", adapted["network_args"])
+        self.assertIn("factor=-1", adapted["network_args"])
+        self.assertIn("full_matrix=True", adapted["network_args"])
+        self.assertNotIn("dora_wd=True", adapted["network_args"])
+        self.assertNotIn("weight_decomposition=True", adapted["network_args"])
+        self.assertTrue(
+            any("weight decomposition" in warning and "mixed_precision=bf16" in warning for warning in warnings)
+        )
+
+    def test_lokr_full_matrix_disables_full_half_precision_in_adapter(self):
+        config = {
+            "network_module": "lycoris.kohya",
+            "lycoris_algo": "lokr",
+            "mixed_precision": "bf16",
+            "full_bf16": True,
+            "full_matrix": True,
+        }
+
+        adapted, warnings = adapt_anima_config(config)
+
+        self.assertIn("full_matrix=True", adapted["network_args"])
+        self.assertNotIn("full_bf16", adapted)
+        self.assertEqual(adapted["scale_weight_norms"], 1)
+        self.assertTrue(any("full_matrix=true" in warning for warning in warnings))
+
+    def test_lokr_fp16_keeps_weight_decomposition_args(self):
+        config = {
+            "network_module": "lycoris.kohya",
+            "lycoris_algo": "lokr",
+            "mixed_precision": "fp16",
+            "dora_wd": True,
+            "network_args": ["weight_decomposition=True"],
+        }
+
+        adapted, warnings = adapt_anima_config(config)
+
+        self.assertIn("dora_wd=True", adapted["network_args"])
+        self.assertIn("weight_decomposition=True", adapted["network_args"])
+
     def test_lycoris_non_lokr_keeps_train_norm(self):
         config = {
             "network_module": "lycoris.kohya",
