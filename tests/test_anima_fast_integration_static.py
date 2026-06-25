@@ -79,6 +79,17 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertIn("dedupeInstallPanels", installer)
         self.assertIn("setControls(last);", installer)
         self.assertIn("already_ready", installer)
+        disabled_controls = installer[
+            installer.index('q(".right-container button").forEach') : installer.index("document.body.classList.toggle", installer.index('q(".right-container button").forEach'))
+        ]
+        self.assertIn('t === "开始训练"', disabled_controls)
+        self.assertIn('t === "Start training"', disabled_controls)
+        self.assertNotIn('t === "✨加载训练预设✨"', disabled_controls)
+        self.assertNotIn('t === "Load training preset"', disabled_controls)
+        self.assertNotIn('t === "保存参数"', disabled_controls)
+        self.assertNotIn('t === "Save parameters"', disabled_controls)
+        self.assertNotIn('t === "导入配置文件"', disabled_controls)
+        self.assertNotIn('t === "Import config"', disabled_controls)
 
     def test_benchmark_example_configs_exist(self):
         examples = Path("docs/examples")

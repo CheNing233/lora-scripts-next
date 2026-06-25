@@ -3,6 +3,21 @@
 本文件记录 **wochenlong/lora-scripts-next** 面向镜像与 AutoDL 的发行说明；上游 kohya-ss/sd-scripts 的变更请见其仓库。
 
 ---
+## v2.8.1 - 2026-06-25
+
+### Release blockers
+
+- **Standard LoRA launch**: allow user-site `torch` / `accelerate` when source installs need them, avoiding training subprocess startup failures that surfaced as “training endpoint network request” errors.
+- **Anima Fast preview**: infer preview enablement from strict prompt or sampling-interval signals when `enable_preview` is dropped or falsified by schema serialization; keep `sample_at_first` defaulting to true for enabled previews.
+- **LoKr bf16 guardrails**: disable known-problematic LoKr bf16 weight-decomposition paths and avoid full-half precision for `full_matrix` adapters to work around upstream LyCORIS dtype issues.
+- **Native tag editor**: keep the experimental native editor route available for direct testing, but hide it from the default sidebar until it is hardened; fix its empty-page render path.
+
+### Packaging notes
+
+- Build the 2.8.1 portable package only from a clean `origin/main` including PRs #160, #163, #164, #165, and #166.
+- Pre-release validation must include: standard LoRA launch from the portable Python environment, Anima Fast preview prompt/TOML generation, default legacy tag editor entry, and hidden native editor sidebar entry.
+
+---
 ## v2.8.0 - 2026-06-19
 
 ### Release blockers

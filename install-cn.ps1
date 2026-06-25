@@ -133,6 +133,15 @@ function Invoke-PipInstallWithRetries {
     return $false
 }
 
+function Test-PythonModuleAvailable {
+    param (
+        [string]$ModuleName
+    )
+
+    python -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('$ModuleName') else 1)" 2>$null
+    return ($LASTEXITCODE -eq 0)
+}
+
 if (-not (Test-InstallScriptFreshness)) { InstallFail }
 
 if (Test-Path -Path "python\python.exe") {
@@ -166,41 +175,57 @@ else {
 
 Write-Output "安装训练依赖 (已进行国内加速，如在国外无法使用加速源请换用 install.ps1 脚本)"
 Write-Output "Torch 将自动测速多个下载源并选择最快可用源。"
-$install_torch = Read-Host "是否需要安装 Torch+xformers? [y/n] (默认为 y)"
-if ($install_torch -eq "y" -or $install_torch -eq "Y" -or $install_torch -eq "") {
+$needTorch = -not (Test-PythonModuleAvailable "torch")
+$needXformers = -not (Test-PythonModuleAvailable "xformers")
+if ($needTorch -or $needXformers) {
     $pytorchSources = @(Select-PytorchSources)
     $pytorchSource = $null
-    $torchInstalled = $false
+    if ($needTorch) {
+        $torchInstalled = $false
 
-    foreach ($source in $pytorchSources) {
-        if ($pytorchSource -ne $null) {
-            Write-Output ("Torch 当前源连续失败，正在尝试备用源: {0}" -f $source.Name)
+        foreach ($source in $pytorchSources) {
+            if ($null -ne $pytorchSource) {
+                Write-Output ("Torch 当前源连续失败，正在尝试备用源: {0}" -f $source.Name)
+            }
+            $pytorchSource = $source
+            Write-Output ("未检测到 Torch，正在安装 Torch，当前源: {0}" -f $pytorchSource.Name)
+            if (Invoke-PipInstallWithRetries -Label "Torch" -PackageArgs @("torch==2.7.0+cu128", "torchvision==0.22.0+cu128") -Source $pytorchSource -RetriesPerSource $TorchInstallRetriesPerSource) {
+                $torchInstalled = $true
+                break
+            }
         }
-        $pytorchSource = $source
-        Write-Output ("正在安装 Torch，当前源: {0}" -f $pytorchSource.Name)
-        if (Invoke-PipInstallWithRetries -Label "Torch" -PackageArgs @("torch==2.7.0+cu128", "torchvision==0.22.0+cu128") -Source $pytorchSource -RetriesPerSource $TorchInstallRetriesPerSource) {
-            $torchInstalled = $true
-            break
-        }
-    }
 
-    if (-not $torchInstalled) {
-        Write-Output "所有可连接的 PyTorch 下载源均安装失败，请删除 venv 文件夹后重新运行。"
-        InstallFail
-    }
-
-    if (-not (Invoke-PipInstallWithRetries -Label "xformers" -PackageArgs @("-U", "-I", "--no-deps", "xformers==0.0.30") -Source $pytorchSource -RetriesPerSource $PackageInstallRetriesPerSource)) {
-        Write-Output "xformers 使用当前源安装失败，正在回退到 PyTorch 官方源..."
-        $officialSource = @{
-            Name = "PyTorch Official"
-            Mode = "index-url"
-            Url = "https://download.pytorch.org/whl/cu128"
-        }
-        if (-not (Invoke-PipInstallWithRetries -Label "xformers" -PackageArgs @("-U", "-I", "--no-deps", "xformers==0.0.30") -Source $officialSource -RetriesPerSource $PackageInstallRetriesPerSource)) {
-            Write-Output "xformers 安装失败。"
+        if (-not $torchInstalled) {
+            Write-Output "所有可连接的 PyTorch 下载源均安装失败，请删除 venv 文件夹后重新运行。"
             InstallFail
         }
     }
+    else {
+        Write-Output "检测到已安装 Torch，跳过 Torch 安装。"
+        $pytorchSource = $pytorchSources[0]
+    }
+
+    if ($needXformers) {
+        Write-Output "未检测到 xformers，正在安装 xformers..."
+        if (-not (Invoke-PipInstallWithRetries -Label "xformers" -PackageArgs @("-U", "-I", "--no-deps", "xformers==0.0.30") -Source $pytorchSource -RetriesPerSource $PackageInstallRetriesPerSource)) {
+            Write-Output "xformers 使用当前源安装失败，正在回退到 PyTorch 官方源..."
+            $officialSource = @{
+                Name = "PyTorch Official"
+                Mode = "index-url"
+                Url = "https://download.pytorch.org/whl/cu128"
+            }
+            if (-not (Invoke-PipInstallWithRetries -Label "xformers" -PackageArgs @("-U", "-I", "--no-deps", "xformers==0.0.30") -Source $officialSource -RetriesPerSource $PackageInstallRetriesPerSource)) {
+                Write-Output "xformers 安装失败。"
+                InstallFail
+            }
+        }
+    }
+    else {
+        Write-Output "检测到已安装 xformers，跳过 xformers 安装。"
+    }
+}
+else {
+    Write-Output "检测到已安装 Torch 和 xformers，跳过 Torch/xformers 安装。"
 }
 
 $requirementsSource = @{

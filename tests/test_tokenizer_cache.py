@@ -1,4 +1,5 @@
 from pathlib import Path
+import importlib.util
 
 import pytest
 
@@ -6,6 +7,7 @@ from mikazuki.tokenizer_cache import (
     BUNDLED_TOKENIZER_DIRS,
     CLIP_TOKENIZER_FILES,
     FLUX_T5_TOKENIZER_HF_ID,
+    OPTIONAL_TOKENIZER_FILES_BY_REPO,
     T5_TOKENIZER_FILES,
     TOKENIZER_FILES,
     bundled_tokenizer_cache_dir,
@@ -27,6 +29,8 @@ def test_tokenizer_local_dir_uses_underscore_folder_names():
 def test_required_tokenizer_files_per_repo():
     assert required_tokenizer_files("openai/clip-vit-large-patch14") == CLIP_TOKENIZER_FILES
     assert required_tokenizer_files(FLUX_T5_TOKENIZER_HF_ID) == T5_TOKENIZER_FILES
+    assert "tokenizer.json" not in T5_TOKENIZER_FILES
+    assert OPTIONAL_TOKENIZER_FILES_BY_REPO[FLUX_T5_TOKENIZER_HF_ID] == ("tokenizer.json",)
     assert TOKENIZER_FILES == CLIP_TOKENIZER_FILES
 
 
@@ -100,6 +104,33 @@ def test_apply_tokenizer_cache_dir_injects_for_flux_lora(tmp_path: Path, monkeyp
     config: dict = {}
     apply_tokenizer_cache_dir(config, "flux-lora")
     assert config["tokenizer_cache_dir"] == str(root).replace("\\", "/")
+
+
+def test_prefetch_warns_when_optional_t5_tokenizer_json_is_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "prefetch_sdxl_tokenizer.py"
+    spec = importlib.util.spec_from_file_location("prefetch_sdxl_tokenizer_test", script_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    def fake_download(hf_repo_id: str, filename: str, dest: Path, **_kwargs):
+        if hf_repo_id == FLUX_T5_TOKENIZER_HF_ID and filename == "tokenizer.json":
+            raise RuntimeError("not found")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text("x", encoding="utf-8")
+
+    monkeypatch.setattr(module, "_download_tokenizer_file", fake_download)
+
+    cache_root = tmp_path / "tokenizer-cache"
+    module.ensure_sdxl_tokenizer_cache(cache_root)
+
+    assert is_tokenizer_bundle_complete(cache_root)
+    assert not (tokenizer_local_dir(cache_root, FLUX_T5_TOKENIZER_HF_ID) / "tokenizer.json").exists()
+    assert "WARNING: optional tokenizer file skipped" in capsys.readouterr().err
 
 
 def test_build_accelerate_train_command_uses_mirror_launch_entry(monkeypatch):

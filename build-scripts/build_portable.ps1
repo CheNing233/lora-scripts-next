@@ -527,7 +527,7 @@ Write-Host "  Cached under tokenizer-cache/ (offline SD/SDXL/Flux tokenizers)" -
 $tokenizerBundles = @(
     @{ Folder = "openai_clip-vit-large-patch14"; Files = @("vocab.json", "merges.txt", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json") },
     @{ Folder = "laion_CLIP-ViT-bigG-14-laion2B-39B-b160k"; Files = @("vocab.json", "merges.txt", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json") },
-    @{ Folder = "google_t5-v1_1-xxl"; Files = @("spiece.model", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json") }
+    @{ Folder = "google_t5-v1_1-xxl"; Files = @("spiece.model", "tokenizer_config.json", "special_tokens_map.json") }
 )
 foreach ($bundle in $tokenizerBundles) {
     foreach ($name in $bundle.Files) {
