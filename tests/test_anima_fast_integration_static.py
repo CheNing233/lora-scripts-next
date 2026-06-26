@@ -75,8 +75,14 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertIn("/help/guide.html#anima-fast-lora", page_text)
         self.assertNotIn("data-anima-fast-guide-toggle", page_text)
         self.assertNotIn("anima-fast-doc-links", page_text)
-        self.assertNotIn("标准模式（Kohya）见 /lora/sd3.html", component.read_text(encoding="utf-8"))
-        self.assertNotIn("标准模式（Kohya）见 /lora/sd3.html", page.read_text(encoding="utf-8"))
+        guide = Path("frontend/dist/help/guide.html").read_text(encoding="utf-8")
+        self.assertIn("sd-guide-pager", guide)
+        self.assertIn("data-guide-pager", guide)
+        self.assertIn("sd-guide-anima-fast", guide)
+        self.assertIn("anima-fast-dataset-guide", guide)
+        self.assertIn("docs/anima-fast.md", guide)
+        self.assertNotIn("标准模式（Kohya）见 /lora/sd3.html", component_text)
+        self.assertNotIn("标准模式（Kohya）见 /lora/sd3.html", page_text)
         self.assertIn("data-anima-fast-ready", installer)
         self.assertIn("b.hidden = ready", installer)
         self.assertIn('b.style.display = ready ? "none" : ""', installer)
@@ -95,6 +101,18 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertNotIn('t === "Save parameters"', disabled_controls)
         self.assertNotIn('t === "导入配置文件"', disabled_controls)
         self.assertNotIn('t === "Import config"', disabled_controls)
+
+    def test_guide_page_chunk_has_valid_syntax(self):
+        guide_js = Path("frontend/dist/assets/guide.html.c3f4a902.js")
+        source = guide_js.read_text(encoding="utf-8")
+        self.assertIn("sd-guide-pager", source)
+        self.assertIn("data-guide-pager", source)
+        self.assertIn("sd-guide-anima-fast", source)
+        self.assertIn("sd-guide-intro", source)
+        self.assertNotIn("\n  <ul>", source)
+        self.assertIn('aria-hidden":"true",style:"display:none"', source)
+        self.assertEqual(source.count("`") % 2, 0)
+        subprocess.run(["node", "--check", str(guide_js)], check=True)
 
     def test_fast_install_log_uses_compact_height(self):
         expected = "max-height:140px"

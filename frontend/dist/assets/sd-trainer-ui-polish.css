@@ -2328,3 +2328,132 @@ html.dark .anima-fast-compile-warn {
   border-color: color-mix(in srgb, var(--el-color-warning, #e6a23c) 32%, var(--c-border, #3d444d));
 }
 /* ----- /Anima Fast UI ----- */
+/* ----- Guide pager ----- */
+main.page .theme-default-content .sd-guide-anima-fast {
+  margin-top: 1.5rem;
+  padding: 1.2rem 1.35rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--el-color-primary) 12%, var(--c-border));
+  background: color-mix(in srgb, var(--el-color-primary) 3%, #fff);
+}
+
+main.page .theme-default-content .sd-guide-anima-fast h2 {
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.4rem;
+  font-size: 1.2rem;
+  border-bottom: 1px solid var(--c-border);
+}
+
+main.page .theme-default-content .sd-guide-anima-fast .anima-fast-dataset-guide__body {
+  margin-top: 0.85rem;
+}
+
+main.page .theme-default-content .sd-guide-pager {
+  display: flex;
+  flex-direction: column;
+  max-width: 56rem;
+  margin: 0 auto;
+  min-height: min(62vh, 560px);
+  max-height: min(84vh, 860px);
+  padding: 1.25rem 1.5rem 1rem;
+  overflow: hidden;
+}
+
+main.page .theme-default-content .sd-guide-pager__viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 0.35rem;
+}
+
+main.page .theme-default-content .sd-guide-pager__page {
+  display: none;
+  padding-bottom: 0.5rem;
+}
+
+main.page .theme-default-content .sd-guide-pager__page.is-active {
+  display: block;
+}
+
+main.page .theme-default-content .sd-guide-pager__page .sd-guide-migrate,
+main.page .theme-default-content .sd-guide-pager__page .sd-guide-anima-fast {
+  margin-top: 0;
+}
+
+main.page .theme-default-content .sd-guide-pager__page .sd-guide-intro {
+  align-items: start;
+}
+
+main.page .theme-default-content .sd-guide-pager__page .sd-guide-intro--text-only {
+  display: block;
+}
+
+main.page .theme-default-content .sd-guide-pager__page .sd-guide-intro--text-only .sd-guide-intro__body {
+  max-width: none;
+}
+
+@media (max-height: 820px) {
+  main.page .theme-default-content .sd-guide-pager {
+    min-height: min(56vh, 480px);
+    max-height: calc(100vh - 4.5rem);
+  }
+}
+
+main.page .theme-default-content .sd-guide-pager__nav {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--c-border, #e4e7ed);
+}
+
+main.page .theme-default-content .sd-guide-pager__btn {
+  min-width: 5.5rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--sd-radius-md, 8px);
+  border: 1px solid var(--c-border, #dcdfe6);
+  background: var(--c-bg-mute, #fff);
+  color: var(--c-text, #303133);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+main.page .theme-default-content .sd-guide-pager__btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--el-color-primary) 35%, var(--c-border));
+  background: color-mix(in srgb, var(--el-color-primary) 6%, var(--c-bg-mute, #fff));
+}
+
+main.page .theme-default-content .sd-guide-pager__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+main.page .theme-default-content .sd-guide-pager__count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-lighter, #606266);
+  letter-spacing: 0.02em;
+}
+
+html.dark main.page .theme-default-content .anima-fast-dataset-guide__body {
+  background: color-mix(in srgb, var(--c-bg-light, #2d333b) 90%, var(--c-bg, #22272e));
+  border-color: var(--c-border, #3d444d);
+}
+
+html.dark main.page .theme-default-content .anima-fast-dataset-guide__body code {
+  background: color-mix(in srgb, var(--c-bg, #22272e) 80%, transparent);
+  border-color: var(--c-border, #3d444d);
+}
+
+html.dark main.page .theme-default-content .anima-fast-dataset-guide__highlight {
+  background: color-mix(in srgb, var(--el-color-warning, #e6a23c) 14%, var(--c-bg, #22272e));
+}
+/* ----- /Guide pager ----- */
