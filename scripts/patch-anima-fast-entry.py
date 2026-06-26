@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "frontend/dist"
 ASSETS = DIST / "assets"
 APP_JS = ASSETS / "app.547295de.js"
+APP_JS_CACHE_KEY = "20260605-routefix2"
+APP_JS_MODULE = f"./app.547295de.js?v={APP_JS_CACHE_KEY}"
 
 SOURCE_HTML = DIST / "lora/sd3.html"
 TARGET_HTML = DIST / "lora/anima-fast.html"
@@ -38,10 +40,15 @@ FAST_PAGE_INTRO = (
 
 FAST_CREDIT_HTML = (
     '<p class="anima-fast-credit">'
-    "Fast 训练引擎来自开源项目 "
-    '<a href="https://github.com/sorryhyun/anima_lora" target="_blank" rel="noopener noreferrer">'
-    "sorryhyun/anima_lora</a>。"
-    "感谢原作者与社区的开发与分享；本页以可选插件形式集成，遵循各自开源许可。"
+    '引擎：<a href="https://github.com/sorryhyun/anima_lora" target="_blank" rel="noopener noreferrer">'
+    "sorryhyun/anima_lora</a>"
+    "</p>"
+)
+
+FAST_GUIDE_LINK_HTML = (
+    '<p class="anima-fast-guide-link">'
+    '说明与数据路径详见 '
+    '<a href="/help/guide.html#anima-fast-lora" data-guide-fast-link>新手上路 → Anima Fast</a>'
     "</p>"
 )
 
@@ -52,6 +59,7 @@ FAST_DOC_LINKS_HTML = (
     f'<a href="{FAST_DOC_URL}" target="_blank" rel="noopener noreferrer">'
     "Fast 模式训练教程</a>（安装、数据路径、故障排除）"
     ' · <a href="/lora/sd3.html">标准 Kohya 模式</a>'
+    ' · <a href="/lora/anima-fast.html"><strong>前往 Fast 训练页</strong></a>'
     "</p>"
 )
 
@@ -76,6 +84,7 @@ FAST_DATASET_GUIDE_HTML = f"""
   </div>
 </div>
 """.strip()
+
 
 FAST_PROGRESS_HTML = """
 <div data-anima-fast-progress hidden style="margin:10px 0 12px 0;padding:10px;border:1px solid var(--c-border);border-radius:6px;background:var(--c-bg-light);">
@@ -103,27 +112,22 @@ def _guide_html_for_vue() -> str:
 
 
 def write_page_chunks() -> None:
-    guide_json = _guide_html_for_vue()
     credit_json = json.dumps(FAST_CREDIT_HTML)
+    link_json = json.dumps(FAST_GUIDE_LINK_HTML)
     progress_json = json.dumps(FAST_PROGRESS_HTML)
     page = (
-        'import{_ as s,o as t,c as o,a as e,b as a}from"./app.547295de.js";'
+        f'import{{_ as s,o as t,c as o,a as e,b as a}}from"{APP_JS_MODULE}";'
         "const _={},"
-        'c=e("h1",{id:"anima-fast-lora",tabindex:"-1"},['
-        'e("a",{class:"header-anchor",href:"#anima-fast-lora","aria-hidden":"true"},"#"),'
-        'a(" Anima LoRA · Fast 模式")],-1),'
-        f'n=e("p",null,{json.dumps(FAST_PAGE_INTRO)},-1),'
         f'x=e("div",{{class:"anima-fast-credit-root",innerHTML:{credit_json}}}),'
-        f'd=e("div",{{class:"anima-fast-doc-links-root",innerHTML:{json.dumps(FAST_DOC_LINKS_HTML)}}}),'
-        f'g=e("div",{{class:"anima-fast-guide-root",innerHTML:{guide_json}}}),'
+        f'l=e("div",{{class:"anima-fast-guide-link-root",innerHTML:{link_json}}}),'
         'm=e("div",{class:"anima-fast-install-panel",style:"display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0;"},['
         'e("button",{"data-anima-fast-install":"",type:"button",class:"el-button el-button--primary is-plain"},['
         'e("span",null,"安装 Fast 训练环境")]),'
         'e("span",{"data-anima-fast-status":"",style:"font-size:13px;opacity:.8;"},"检查中")],-1),'
         f'v=e("div",{{class:"anima-fast-progress-root",innerHTML:{progress_json}}}),'
         f'f=e("pre",{{"data-anima-fast-log":"",hidden:"",style:{json.dumps(FAST_INSTALL_LOG_STYLE)}}},null,-1),'
-        "l=[c,n,x,d,g,m,v,f];"
-        'function i(h,u){return t(),o("div",{class:"anima-fast-intro-wrap"},l)}'
+        "parts=[x,l,m,v,f];"
+        'function i(h,u){return t(),o("div",{class:"anima-fast-intro-wrap"},parts)}'
         'var p=s(_,[["render",i],["__file","anima-fast.html.vue"]]);export{p as default};'
     )
     PAGE_JS.write_text(page, encoding="utf-8")
@@ -149,13 +153,8 @@ def patch_html() -> None:
     html = html.replace("/assets/sd3.html.eaeb05e1.js", f"/assets/{DATA_JS.name}")
     main_block = (
         '<main><div class="anima-fast-intro-wrap">'
-        '<h1 id="anima-fast-lora" tabindex="-1">'
-        '<a class="header-anchor" href="#anima-fast-lora" aria-hidden="true">#</a> '
-        'Anima LoRA · Fast 模式</h1>'
-        f'<p>{FAST_PAGE_INTRO}</p>'
         f'{FAST_CREDIT_HTML}'
-        f'{FAST_DOC_LINKS_HTML}'
-        f'{FAST_DATASET_GUIDE_HTML}'
+        f'{FAST_GUIDE_LINK_HTML}'
         '<div class="anima-fast-install-panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0;">'
         '<button data-anima-fast-install type="button" class="el-button el-button--primary is-plain">'
         '<span>安装 Fast 训练环境</span></button>'
@@ -237,14 +236,31 @@ def _fast_ui_css_block() -> str:
     return f"""
 {FAST_UI_CSS_MARKER}
 .example-container > .right-container .anima-fast-credit {{
-  margin: 0.55rem 0 0.65rem;
-  padding: 0.65rem 0.85rem;
+  margin: 0.35rem 0 0.5rem;
+  padding: 0.45rem 0.65rem;
   border-radius: var(--sd-radius-md, 8px);
   font-size: 12.5px;
-  line-height: 1.65;
+  line-height: 1.5;
   color: var(--c-text-lighter, #606266);
   background: color-mix(in srgb, var(--el-color-success, #67c23a) 7%, var(--c-bg, #fff));
   border: 1px solid color-mix(in srgb, var(--el-color-success, #67c23a) 24%, var(--c-border, #dcdfe6));
+}}
+
+.example-container > .right-container .anima-fast-guide-link {{
+  margin: 0 0 0.65rem;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--c-text-lighter, #606266);
+}}
+
+.example-container > .right-container .anima-fast-guide-link a {{
+  color: var(--el-color-primary, #409eff);
+  font-weight: 600;
+  text-decoration: none;
+}}
+
+.example-container > .right-container .anima-fast-guide-link a:hover {{
+  text-decoration: underline;
 }}
 
 .example-container > .right-container .anima-fast-doc-links {{
@@ -274,14 +290,33 @@ def _fast_ui_css_block() -> str:
   text-decoration: underline;
 }}
 
+body.anima-fast-page .theme-container.no-navbar .example-container {{
+  height: 100vh;
+  min-height: 0;
+  align-items: stretch;
+}}
+
+body.anima-fast-page .example-container > .schema-container,
+body.anima-fast-page .example-container > .right-container {{
+  min-height: 0;
+  overflow: hidden;
+}}
+
 body.anima-fast-page .example-container > .right-container > section:first-of-type {{
   flex: 0 0 auto;
+  overflow: visible;
+  padding-top: 0.25rem;
 }}
 
 body.anima-fast-page .example-container > .right-container > section:first-of-type .el-scrollbar,
-body.anima-fast-page .example-container > .right-container > section:first-of-type .el-scrollbar__wrap {{
-  overflow: visible !important;
+body.anima-fast-page .example-container > .right-container > section:first-of-type .el-scrollbar__wrap,
+body.anima-fast-page .example-container > .right-container > section:first-of-type .el-scrollbar__view {{
+  height: auto !important;
   max-height: none !important;
+}}
+
+body.anima-fast-page .example-container > .right-container > section:first-of-type main {{
+  padding-top: 0;
 }}
 
 body.anima-fast-page [data-anima-fast-log] {{
@@ -289,59 +324,41 @@ body.anima-fast-page [data-anima-fast-log] {{
   margin: 8px 0 10px 0 !important;
 }}
 
+body.anima-fast-page .example-container > .right-container > section:has(.params-section) {{
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}}
+
+body.anima-fast-page .example-container > .right-container > section:has(.params-section) .params-section {{
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}}
+
+body.anima-fast-page .example-container > .right-container > section:has(.params-section) .params-section .el-scrollbar {{
+  flex: 1 1 auto;
+  min-height: 0;
+}}
+
+body.anima-fast-page .example-container > .right-container > section:has(.params-section) .params-section .el-scrollbar__wrap {{
+  max-height: none !important;
+  overflow: auto !important;
+}}
+
+body.anima-fast-page .example-container > .right-container > .el-row {{
+  flex: 0 0 auto;
+}}
+
 .example-container > .right-container .anima-fast-intro-wrap {{
   padding-bottom: 0.25rem;
 }}
 
-.example-container > .right-container .anima-fast-guide-collapsible {{
-  margin: 0.15rem 0 0.85rem;
-}}
-
-.example-container > .right-container .anima-fast-guide-toggle {{
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  width: auto;
-  max-width: 100%;
-  margin: 0;
-  padding: 0.1rem 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  appearance: none;
-  -webkit-appearance: none;
-  color: var(--el-color-primary, #409eff);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.5;
-  cursor: pointer;
-  text-align: left;
-  box-shadow: none;
-}}
-
-.example-container > .right-container .anima-fast-guide-toggle:hover {{
-  color: var(--el-color-primary-dark-2, #337ecc);
-  text-decoration: underline;
-}}
-
-.example-container > .right-container .anima-fast-guide-toggle:focus-visible {{
-  outline: 2px solid color-mix(in srgb, var(--el-color-primary, #409eff) 45%, transparent);
-  outline-offset: 2px;
-}}
-
-.example-container > .right-container .anima-fast-guide-toggle__icon {{
-  flex: 0 0 auto;
-  font-size: 11px;
-  opacity: 0.85;
-  transition: transform 0.15s ease;
-}}
-
-.example-container > .right-container .anima-fast-guide-collapsible.is-open .anima-fast-guide-toggle__icon {{
-  transform: rotate(90deg);
-}}
-
-.example-container > .right-container .anima-fast-dataset-guide__body {{
+.anima-fast-dataset-guide__body {{
   margin-top: 0.45rem;
   padding: 0.75rem 0.9rem;
   border-radius: var(--sd-radius-md, 8px);
@@ -353,20 +370,20 @@ body.anima-fast-page [data-anima-fast-log] {{
   border-left: 3px solid var(--el-color-primary, #409eff);
 }}
 
-.example-container > .right-container .anima-fast-dataset-guide__body p {{
+.anima-fast-dataset-guide__body p {{
   margin: 0.35rem 0;
 }}
 
-.example-container > .right-container .anima-fast-dataset-guide__body ul {{
+.anima-fast-dataset-guide__body ul {{
   margin: 0.35rem 0 0.5rem 1.1rem;
   padding: 0;
 }}
 
-.example-container > .right-container .anima-fast-dataset-guide__body li {{
+.anima-fast-dataset-guide__body li {{
   margin: 0.2rem 0;
 }}
 
-.example-container > .right-container .anima-fast-dataset-guide__body code {{
+.anima-fast-dataset-guide__body code {{
   font-size: 12px;
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
@@ -374,14 +391,14 @@ body.anima-fast-page [data-anima-fast-log] {{
   border: 1px solid var(--c-border, #e4e7ed);
 }}
 
-.example-container > .right-container .anima-fast-dataset-guide__highlight {{
+.anima-fast-dataset-guide__highlight {{
   padding: 0.55rem 0.65rem;
   border-radius: 8px;
   background: color-mix(in srgb, var(--el-color-warning, #e6a23c) 10%, var(--c-bg, #fff));
   border: 1px solid color-mix(in srgb, var(--el-color-warning, #e6a23c) 28%, transparent);
 }}
 
-.example-container > .right-container .anima-fast-dataset-guide__note {{
+.anima-fast-dataset-guide__note {{
   font-size: 12.5px;
   color: var(--c-text-lighter, #606266);
 }}
@@ -418,17 +435,20 @@ html.dark .example-container > .right-container .anima-fast-credit {{
   color: var(--c-text-lighter, #adbac7);
 }}
 
-html.dark .example-container > .right-container .anima-fast-dataset-guide__body {{
+html.dark .example-container > .right-container .anima-fast-dataset-guide__body,
+html.dark main.page .theme-default-content .anima-fast-dataset-guide__body {{
   background: color-mix(in srgb, var(--c-bg-light, #2d333b) 90%, var(--c-bg, #22272e));
   border-color: var(--c-border, #3d444d);
 }}
 
-html.dark .example-container > .right-container .anima-fast-dataset-guide__body code {{
+html.dark .example-container > .right-container .anima-fast-dataset-guide__body code,
+html.dark main.page .theme-default-content .anima-fast-dataset-guide__body code {{
   background: color-mix(in srgb, var(--c-bg, #22272e) 80%, transparent);
   border-color: var(--c-border, #3d444d);
 }}
 
-html.dark .example-container > .right-container .anima-fast-dataset-guide__highlight {{
+html.dark .example-container > .right-container .anima-fast-dataset-guide__highlight,
+html.dark main.page .theme-default-content .anima-fast-dataset-guide__highlight {{
   background: color-mix(in srgb, var(--el-color-warning, #e6a23c) 14%, var(--c-bg, #22272e));
 }}
 
@@ -553,10 +573,11 @@ def assert_registered() -> None:
         ("/lora/anima-fast.html" in app, "route registered"),
         (TRAIN_TYPE in DATA_JS.read_text(encoding="utf-8"), "train type in data"),
         (PAGE_JS.name in html and DATA_JS.name in html, "html preloads chunks"),
-        (GUIDE_CSS_MARKER in html, "dataset guide in html"),
+        (GUIDE_CSS_MARKER in POLISH_CSS.read_text(encoding="utf-8"), "dataset guide css marker"),
         (CREDIT_CSS_MARKER in html, "open-source credit in html"),
-        ("anima-fast-doc-links" in html, "doc tutorial link in html"),
-        ("data-anima-fast-guide-toggle" in html, "collapsible guide toggle in html"),
+        ("anima-fast-guide-link" in html, "guide portal link in html"),
+        ("/help/guide.html#anima-fast-lora" in html, "guide anchor link in html"),
+        ("data-anima-fast-install" in html, "install panel in html"),
         (FAST_UI_CSS_MARKER in POLISH_CSS.read_text(encoding="utf-8"), "fast ui css block"),
         (INSTALL_JS.name in html, "install guard script in target html"),
         (INSTALL_JS.name in (DIST / "index.html").read_text(encoding="utf-8"), "install guard script in root html"),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -63,13 +64,17 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertIn("/lora/anima-fast.html", app)
         self.assertIn('"text":"Fast 模式","link":"/lora/anima-fast.md"', app)
         self.assertIn("anima-lora-fast", data.read_text(encoding="utf-8"))
-        self.assertIn("data-anima-fast-install", component.read_text(encoding="utf-8"))
-        self.assertIn("anima-fast-dataset-guide", page.read_text(encoding="utf-8"))
-        self.assertIn("data-anima-fast-guide-toggle", page.read_text(encoding="utf-8"))
-        self.assertIn("sorryhyun/anima_lora", page.read_text(encoding="utf-8"))
-        self.assertIn("anima-fast-credit", page.read_text(encoding="utf-8"))
-        self.assertIn("anima-fast-doc-links", page.read_text(encoding="utf-8"))
-        self.assertIn("docs/anima-fast.md", page.read_text(encoding="utf-8"))
+        component_text = component.read_text(encoding="utf-8")
+        self.assertIn("data-anima-fast-install", component_text)
+        self.assertIn('from"./app.547295de.js?v=20260605-routefix2"', component_text)
+        self.assertNotIn('from"./app.547295de.js";', component_text)
+        page_text = page.read_text(encoding="utf-8")
+        self.assertIn("sorryhyun/anima_lora", page_text)
+        self.assertIn("anima-fast-credit", page_text)
+        self.assertIn("anima-fast-guide-link", page_text)
+        self.assertIn("/help/guide.html#anima-fast-lora", page_text)
+        self.assertNotIn("data-anima-fast-guide-toggle", page_text)
+        self.assertNotIn("anima-fast-doc-links", page_text)
         self.assertNotIn("标准模式（Kohya）见 /lora/sd3.html", component.read_text(encoding="utf-8"))
         self.assertNotIn("标准模式（Kohya）见 /lora/sd3.html", page.read_text(encoding="utf-8"))
         self.assertIn("data-anima-fast-ready", installer)
@@ -104,6 +109,24 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
             self.assertIn("data-anima-fast-log", text, path)
             self.assertIn(expected, text, path)
             self.assertNotIn("max-height:260px", text, path)
+
+    def test_fast_page_uses_viewport_split_layout(self):
+        css = Path("frontend/dist/assets/sd-trainer-ui-polish.css").read_text(encoding="utf-8")
+        self.assertIn(
+            "body.anima-fast-page .theme-container.no-navbar .example-container",
+            css,
+        )
+        self.assertIn("height: 100vh", css)
+        self.assertIn("min-height: 0", css)
+        self.assertNotIn("body.anima-fast-page .theme-container.no-navbar .example-container {\n  height: auto;", css)
+        self.assertIn(
+            "body.anima-fast-page .example-container > .right-container > section:has(.params-section)",
+            css,
+        )
+        self.assertIn(
+            "body.anima-fast-page .example-container > .right-container > .el-row",
+            css,
+        )
 
     def test_frontend_dist_uses_project_version_cache_bust(self):
         version = Path("VERSION").read_text(encoding="utf-8").strip()
