@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,6 +86,86 @@ FAST_DATASET_GUIDE_HTML = f"""
 </div>
 """.strip()
 
+
+GUIDE_PAGER_CSS_MARKER = "/* ----- Guide pager ----- */"
+
+
+def build_fast_guide_section_html(*, compact: bool = False) -> str:
+    body = FAST_DATASET_GUIDE_BODY
+    if compact:
+        body = re.sub(r"\s+", " ", body.strip())
+    return (
+        '<section class="sd-guide-anima-fast">'
+        '<h2 id="anima-fast-lora" tabindex="-1">'
+        '<a class="header-anchor" href="#anima-fast-lora" aria-hidden="true">#</a> '
+        "Anima LoRA · Fast 模式</h2>"
+        f"<p>{FAST_PAGE_INTRO}</p>"
+        f"{FAST_DOC_LINKS_HTML}"
+        f'<div class="anima-fast-dataset-guide anima-fast-dataset-guide__body">{body}</div>'
+        "</section>"
+    )
+
+
+GUIDE_INTRO_INNER = (
+    '<div class="sd-guide-intro sd-guide-intro--text-only">'
+    '<div class="sd-guide-intro__body">'
+    '<h2 id="新手上路" tabindex="-1">'
+    '<a class="header-anchor" href="#新手上路" aria-hidden="true">#</a> 新手上路</h2>'
+    "<ol>"
+    "<li><strong>准备数据</strong>：训练图片 + 同名 <code>.txt</code> 标签；可用「工具与调试 → 数据集打标」。</li>"
+    "<li><strong>选择训练类型</strong>（侧栏「训练」）："
+    "<ul>"
+    "<li><strong>LoRA 训练</strong><ul>"
+    '<li><a href="/lora/sd3.html">Anima LoRA</a> — Anima DiT（推荐）</li>'
+    '<li><a href="/lora/anima-fast.html">Anima Fast</a> — 可选插件加速（进阶，页内安装）</li>'
+    '<li><a href="/lora/flux.html">Flux</a></li>'
+    '<li><a href="/lora/master.html">Stable Diffusion</a> — SD1.5 / SDXL LoRA</li>'
+    "</ul></li>"
+    "<li><strong>全量微调</strong><ul>"
+    '<li><a href="/lora/anima-finetune.html">Anima Finetune</a> — DiT 整模微调（高显存）</li>'
+    '<li><a href="/dreambooth/index.html">Stable Diffusion</a> — 默认 SDXL Finetune，可切换 SD1.5 Dreambooth</li>'
+    "</ul></li></ul></li>"
+    "<li><strong>填写参数并开训</strong>：中栏表单 → 右栏「开始训练」。</li>"
+    '<li><strong>查看进度</strong>：<a href="/train-monitor" target="_blank" rel="noopener noreferrer">训练监控</a>、'
+    '<a href="/tensorboard.html">Tensorboard</a>。</li>'
+    "</ol></div></div>"
+)
+
+GUIDE_MIGRATE_INNER = (
+    '<div class="sd-guide-migrate">'
+    '<h2 id="从秋叶版迁移" tabindex="-1">'
+    '<a class="header-anchor" href="#从秋叶版迁移" aria-hidden="true">#</a> 从秋叶版迁移</h2>'
+    "<p>若你使用过 <strong>Akegarasu/lora-scripts</strong>（秋叶一键包），本版主要变化：</p>"
+    "<ul>"
+    "<li><strong>品牌</strong>：项目名 <strong>lora-scripts-next</strong> / Next Trainer，侧栏按「训练 / 工具 / 帮助 / 其他」分组。</li>"
+    '<li><strong>导航</strong>：LoRA 与全量微调分栏；原「新手 / 专家」不再平铺（SD1.5 精简页：<a href="/lora/basic.html">/lora/basic.html</a>）。</li>'
+    "<li><strong>Anima</strong>：LoRA 与 Finetune 分入口（Qwen + T5 + DiT）。</li>"
+    '<li><strong>监控</strong>：独立 <a href="/train-monitor" target="_blank" rel="noopener noreferrer">训练监控页</a>、Loss 曲线、<code>/train-log</code> 日志流。</li>'
+    '<li>更多版本说明见 <a href="/other/changelog.html">更新日志</a>。</li>'
+    "</ul></div>"
+)
+
+
+def build_full_guide_pager_html(*, compact: bool = False) -> str:
+    intro = re.sub(r">\s+<", "><", GUIDE_INTRO_INNER) if compact else GUIDE_INTRO_INNER
+    migrate = re.sub(r">\s+<", "><", GUIDE_MIGRATE_INNER) if compact else GUIDE_MIGRATE_INNER
+    fast = build_fast_guide_section_html(compact=compact)
+    return (
+        '<div class="sd-guide sd-guide-pager" data-guide-pager>'
+        '<div class="sd-guide-pager__viewport"><div class="sd-guide-pager__pages">'
+        '<section class="sd-guide-pager__page is-active" data-guide-page="0" id="guide-page-intro" aria-label="新手上路">'
+        f"{intro}</section>"
+        '<section class="sd-guide-pager__page" data-guide-page="1" id="guide-page-migrate" aria-label="从秋叶版迁移">'
+        f"{migrate}</section>"
+        '<section class="sd-guide-pager__page" data-guide-page="2" id="guide-page-fast" aria-label="Anima Fast">'
+        f"{fast}</section>"
+        "</div></div>"
+        '<nav class="sd-guide-pager__nav" aria-label="新手上路翻页">'
+        '<button type="button" class="sd-guide-pager__btn" data-guide-prev disabled>上一页</button>'
+        '<span class="sd-guide-pager__count" data-guide-count>1 / 3</span>'
+        '<button type="button" class="sd-guide-pager__btn" data-guide-next>下一页</button>'
+        "</nav></div>"
+    )
 
 FAST_PROGRESS_HTML = """
 <div data-anima-fast-progress hidden style="margin:10px 0 12px 0;padding:10px;border:1px solid var(--c-border);border-radius:6px;background:var(--c-bg-light);">
@@ -554,6 +635,232 @@ def _sync_style_bundle(polish_css: str) -> None:
     STYLE_CSS.write_text(style[:anchor] + polish_css, encoding="utf-8")
 
 
+def _guide_pager_css_block() -> str:
+    return f"""{GUIDE_PAGER_CSS_MARKER}
+main.page .theme-default-content .sd-guide-anima-fast {{
+  margin-top: 1.5rem;
+  padding: 1.2rem 1.35rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--el-color-primary) 12%, var(--c-border));
+  background: color-mix(in srgb, var(--el-color-primary) 3%, #fff);
+}}
+
+main.page .theme-default-content .sd-guide-anima-fast h2 {{
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.4rem;
+  font-size: 1.2rem;
+  border-bottom: 1px solid var(--c-border);
+}}
+
+main.page .theme-default-content .sd-guide-anima-fast .anima-fast-dataset-guide__body {{
+  margin-top: 0.85rem;
+}}
+
+main.page .theme-default-content .sd-guide-pager {{
+  display: flex;
+  flex-direction: column;
+  max-width: 56rem;
+  margin: 0 auto;
+  min-height: min(62vh, 560px);
+  max-height: min(84vh, 860px);
+  padding: 1.25rem 1.5rem 1rem;
+  overflow: hidden;
+}}
+
+main.page .theme-default-content .sd-guide-pager__viewport {{
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 0.35rem;
+}}
+
+main.page .theme-default-content .sd-guide-pager__page {{
+  display: none;
+  padding-bottom: 0.5rem;
+}}
+
+main.page .theme-default-content .sd-guide-pager__page.is-active {{
+  display: block;
+}}
+
+main.page .theme-default-content .sd-guide-pager__page .sd-guide-migrate,
+main.page .theme-default-content .sd-guide-pager__page .sd-guide-anima-fast {{
+  margin-top: 0;
+}}
+
+main.page .theme-default-content .sd-guide-pager__page .sd-guide-intro {{
+  align-items: start;
+}}
+
+main.page .theme-default-content .sd-guide-pager__page .sd-guide-intro--text-only {{
+  display: block;
+}}
+
+main.page .theme-default-content .sd-guide-pager__page .sd-guide-intro--text-only .sd-guide-intro__body {{
+  max-width: none;
+}}
+
+@media (max-height: 820px) {{
+  main.page .theme-default-content .sd-guide-pager {{
+    min-height: min(56vh, 480px);
+    max-height: calc(100vh - 4.5rem);
+  }}
+}}
+
+main.page .theme-default-content .sd-guide-pager__nav {{
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--c-border, #e4e7ed);
+}}
+
+main.page .theme-default-content .sd-guide-pager__btn {{
+  min-width: 5.5rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--sd-radius-md, 8px);
+  border: 1px solid var(--c-border, #dcdfe6);
+  background: var(--c-bg-mute, #fff);
+  color: var(--c-text, #303133);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}}
+
+main.page .theme-default-content .sd-guide-pager__btn:hover:not(:disabled) {{
+  border-color: color-mix(in srgb, var(--el-color-primary) 35%, var(--c-border));
+  background: color-mix(in srgb, var(--el-color-primary) 6%, var(--c-bg-mute, #fff));
+}}
+
+main.page .theme-default-content .sd-guide-pager__btn:disabled {{
+  opacity: 0.45;
+  cursor: not-allowed;
+}}
+
+main.page .theme-default-content .sd-guide-pager__count {{
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-lighter, #606266);
+  letter-spacing: 0.02em;
+}}
+
+html.dark main.page .theme-default-content .anima-fast-dataset-guide__body {{
+  background: color-mix(in srgb, var(--c-bg-light, #2d333b) 90%, var(--c-bg, #22272e));
+  border-color: var(--c-border, #3d444d);
+}}
+
+html.dark main.page .theme-default-content .anima-fast-dataset-guide__body code {{
+  background: color-mix(in srgb, var(--c-bg, #22272e) 80%, transparent);
+  border-color: var(--c-border, #3d444d);
+}}
+
+html.dark main.page .theme-default-content .anima-fast-dataset-guide__highlight {{
+  background: color-mix(in srgb, var(--el-color-warning, #e6a23c) 14%, var(--c-bg, #22272e));
+}}
+/* ----- /Guide pager ----- */
+"""
+
+
+def _upsert_guide_pager_css(css: str, block: str) -> str:
+    end_marker = "/* ----- /Guide pager ----- */"
+    if GUIDE_PAGER_CSS_MARKER in css and end_marker in css:
+        start = css.index(GUIDE_PAGER_CSS_MARKER)
+        end = css.index(end_marker) + len(end_marker)
+        return css[:start] + block.strip() + css[end:]
+    return css.rstrip() + "\n" + block.strip() + "\n"
+
+
+def _escape_js_template(html: str) -> str:
+    return html.replace("\\", "\\\\").replace("`", "\\`").replace("\r", "").replace("\n", "")
+
+
+def rebuild_guide_html() -> None:
+    guide_html_path = DIST / "help" / "guide.html"
+    html = guide_html_path.read_text(encoding="utf-8")
+    start = html.index('<div class="sd-guide')
+    end = html.index("</div></div><!--[--><!--]--></div><footer", start)
+    new_body = build_full_guide_pager_html(compact=True)
+    guide_html_path.write_text(html[:start] + new_body + html[end + len("</div>") :], encoding="utf-8")
+
+
+def _assert_guide_page_js_valid(source: str, path: Path) -> None:
+    path.write_text(source, encoding="utf-8")
+    if "sd-guide-pager" not in source or "data-guide-pager" not in source:
+        raise RuntimeError(f"guide page chunk missing pager markers: {path}")
+    if "sd-guide-anima-fast" not in source or "sd-guide-intro" not in source:
+        raise RuntimeError(f"guide page chunk missing expected markers: {path}")
+    if source.count("`") % 2 != 0:
+        raise RuntimeError(f"guide page chunk has unbalanced backticks: {path}")
+    try:
+        subprocess.run(
+            ["node", "--check", str(path)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        if "`\n" in source or "\n  <" in source:
+            raise RuntimeError(f"guide page chunk looks multiline-broken: {path}") from None
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or exc.stdout or "").strip()
+        raise RuntimeError(f"guide page chunk syntax invalid: {path}\n{detail}") from exc
+
+
+def rebuild_guide_page_js() -> None:
+    guide_js = ASSETS / "guide.html.c3f4a902.js"
+    inner = _escape_js_template(build_full_guide_pager_html(compact=True))
+    source = (
+        'import{_ as n,o as s,c as a,a as e,e as i}from"'
+        + APP_JS_MODULE.lstrip("./")
+        + '";'
+        "const _={},h=i(`"
+        + inner
+        + "`);"
+        'function u(){return s(),a("div",null,[e("span",{"aria-hidden":"true",style:"display:none"},".",-1),h])}'
+        'var x=n(_,[["render",u],["__file","guide.html.vue"]]);export{x as default};'
+    )
+    _assert_guide_page_js_valid(source, guide_js)
+
+
+def patch_guide_pager() -> None:
+    rebuild_guide_html()
+    rebuild_guide_page_js()
+
+
+def append_guide_pager_css() -> None:
+    if not POLISH_CSS.exists():
+        return
+    block = _guide_pager_css_block()
+    css = _upsert_guide_pager_css(POLISH_CSS.read_text(encoding="utf-8"), block)
+    POLISH_CSS.write_text(css, encoding="utf-8")
+    _sync_style_bundle(css)
+
+
+def _guide_page_js_valid() -> bool:
+    guide_js = ASSETS / "guide.html.c3f4a902.js"
+    if not guide_js.is_file():
+        return False
+    text = guide_js.read_text(encoding="utf-8")
+    if "sd-guide-pager" not in text or "data-guide-pager" not in text:
+        return False
+    if "sd-guide-anima-fast" not in text or "sd-guide-intro" not in text:
+        return False
+    if text.count("`") % 2 != 0 or "\n  <" in text:
+        return False
+    try:
+        subprocess.run(["node", "--check", str(guide_js)], check=True, capture_output=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return text.count("\n") <= 1
+    return True
+
+
 def append_guide_css() -> None:
     if not POLISH_CSS.exists():
         return
@@ -581,6 +888,8 @@ def assert_registered() -> None:
         (FAST_UI_CSS_MARKER in POLISH_CSS.read_text(encoding="utf-8"), "fast ui css block"),
         (INSTALL_JS.name in html, "install guard script in target html"),
         (INSTALL_JS.name in (DIST / "index.html").read_text(encoding="utf-8"), "install guard script in root html"),
+        ("sd-guide-pager" in (DIST / "help" / "guide.html").read_text(encoding="utf-8"), "guide pager in html"),
+        (_guide_page_js_valid(), "guide page chunk syntax"),
     ]
     missing = [label for ok, label in checks if not ok]
     if missing:
@@ -593,6 +902,8 @@ def main() -> None:
     patch_app_js()
     patch_prefetch_links()
     append_guide_css()
+    append_guide_pager_css()
+    patch_guide_pager()
     assert_registered()
     print("patched Anima Fast frontend entry")
 

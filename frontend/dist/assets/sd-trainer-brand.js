@@ -115,6 +115,104 @@
     document.head.appendChild(script);
   }
 
+  const GUIDE_PAGE_HASHES = ["#新手上路", "#从秋叶版迁移", "#anima-fast-lora"];
+
+  function hashToGuideIndex() {
+    const hash = location.hash || "#新手上路";
+    const i = GUIDE_PAGE_HASHES.indexOf(hash);
+    return i >= 0 ? i : 0;
+  }
+
+  function setupGuidePagerRoot(root) {
+    if (!root || root.dataset.guidePagerReady === "1") return;
+    root.dataset.guidePagerReady = "1";
+
+    const pages = Array.from(root.querySelectorAll("[data-guide-page]"));
+    if (!pages.length) return;
+
+    const prevBtn = root.querySelector("[data-guide-prev]");
+    const nextBtn = root.querySelector("[data-guide-next]");
+    const countEl = root.querySelector("[data-guide-count]");
+    let index = hashToGuideIndex();
+
+    function setPage(i, opts) {
+      index = Math.max(0, Math.min(pages.length - 1, i));
+      pages.forEach(function (p, j) {
+        p.classList.toggle("is-active", j === index);
+        p.hidden = j !== index;
+      });
+      if (prevBtn) prevBtn.disabled = index === 0;
+      if (nextBtn) nextBtn.disabled = index === pages.length - 1;
+      if (countEl) countEl.textContent = index + 1 + " / " + pages.length;
+      root.dataset.guideCurrentPage = String(index);
+      const hash = GUIDE_PAGE_HASHES[index];
+      if (!opts || !opts.skipHash) {
+        const url = location.pathname + location.search + hash;
+        if (location.pathname + location.search + location.hash !== url) {
+          history.replaceState(null, "", url);
+        }
+      }
+      const viewport = root.querySelector(".sd-guide-pager__viewport");
+      if (viewport) viewport.scrollTop = 0;
+      const main = document.querySelector("main.page");
+      if (main) main.scrollTop = 0;
+    }
+
+    root._guideSetPage = setPage;
+    setPage(index, { skipHash: true });
+  }
+
+  function scanGuidePagers() {
+    if (!/^\/help\/guide(\.html|\.md)?$/i.test(location.pathname)) return;
+    document.querySelectorAll("[data-guide-pager]").forEach(setupGuidePagerRoot);
+  }
+
+  function syncGuidePagerFromHash() {
+    if (!/^\/help\/guide(\.html|\.md)?$/i.test(location.pathname)) return;
+    const idx = hashToGuideIndex();
+    document.querySelectorAll("[data-guide-pager]").forEach(function (root) {
+      if (root.dataset.guidePagerReady === "1" && typeof root._guideSetPage === "function") {
+        root._guideSetPage(idx, { skipHash: true });
+      }
+    });
+  }
+
+  function onGuidePagerClick(ev) {
+    const prev = ev.target && ev.target.closest && ev.target.closest("[data-guide-prev]");
+    const next = ev.target && ev.target.closest && ev.target.closest("[data-guide-next]");
+    if (!prev && !next) return;
+    const root = (prev || next).closest("[data-guide-pager]");
+    if (!root) return;
+    ev.preventDefault();
+    if (root.dataset.guidePagerReady !== "1") setupGuidePagerRoot(root);
+    const idx = parseInt(root.dataset.guideCurrentPage || "0", 10);
+    const total = root.querySelectorAll("[data-guide-page]").length;
+    if (prev && idx > 0 && typeof root._guideSetPage === "function") root._guideSetPage(idx - 1);
+    if (next && idx < total - 1 && typeof root._guideSetPage === "function") root._guideSetPage(idx + 1);
+  }
+
+  function watchGuidePagerMount() {
+    if (window.__sdGuidePagerWatcher__) return;
+    window.__sdGuidePagerWatcher__ = true;
+    const obs = new MutationObserver(function () {
+      scanGuidePagers();
+    });
+    if (document.body) {
+      obs.observe(document.body, { childList: true, subtree: true });
+    }
+  }
+
+  function scheduleGuidePager() {
+    scanGuidePagers();
+    let left = 60;
+    const timer = setInterval(function () {
+      scanGuidePagers();
+      if (--left <= 0) clearInterval(timer);
+    }, 150);
+  }
+
+  document.addEventListener("click", onGuidePagerClick);
+
   document.addEventListener("click", function (ev) {
     const link = ev.target && ev.target.closest && ev.target.closest("[data-guide-fast-link]");
     if (!link) return;
@@ -124,10 +222,15 @@
 
   async function boot() {
     const version = (await fetchVersion()) || versionFromScriptTag();
-    if (!version) return;
-    ensureChip(version);
+    if (version) ensureChip(version);
     setupMobileNav();
     loadAnimaFastInstall();
+    watchGuidePagerMount();
+    scheduleGuidePager();
+    window.addEventListener("hashchange", function () {
+      scanGuidePagers();
+      syncGuidePagerFromHash();
+    });
 
     let tries = 0;
     const retry = setInterval(function () {
