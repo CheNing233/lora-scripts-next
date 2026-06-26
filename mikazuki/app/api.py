@@ -1159,6 +1159,35 @@ async def anima_lora_install_log_stream(task_id: str):
     return await train_log_stream(task_id)
 
 
+@router.get("/plugins/anima-lora/install/progress/stream/{task_id}")
+async def anima_lora_install_progress_stream(task_id: str):
+    """Server-Sent Events: structured Anima Fast install progress."""
+    if task_id not in tm.tasks:
+        raise HTTPException(status_code=404, detail="Unknown task_id")
+
+    async def event_generator():
+        idx = 0
+        while True:
+            await asyncio.sleep(0.08)
+            events, total, done = train_log_hub.snapshot_events_from(task_id, idx)
+            for event in events:
+                yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
+            idx = total
+            if done:
+                yield "data: " + json.dumps({"type": "done", "done": True}, ensure_ascii=False) + "\n\n"
+                break
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/train/log/tail/{task_id}")
 async def train_log_tail(task_id: str, limit: int = 240):
     """Recent training stdout lines for the lightweight monitor page."""

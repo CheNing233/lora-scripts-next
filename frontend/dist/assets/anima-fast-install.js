@@ -11,9 +11,12 @@
 
   let last = { feature_enabled: true, state: "unknown" };
   let es = null;
+  let progressEs = null;
   let tmr = null;
   let scheduled = false;
   let observedPath = location.pathname;
+  let progressStartedAt = 0;
+  let reconnectedInstallTask = "";
 
   function q(sel) {
     return Array.from(document.querySelectorAll(sel));
@@ -61,6 +64,7 @@
       ) {
         b.disabled = kill || !ready;
         b.setAttribute("aria-disabled", b.disabled ? "true" : "false");
+        b.setAttribute("data-anima-fast-train-gated", !ready ? "1" : "0");
       }
     });
     document.body.classList.toggle("anima-fast-disabled", kill || !ready);
@@ -94,6 +98,62 @@
     p.hidden = false;
     p.textContent += (p.textContent ? "\n" : "") + x;
     p.scrollTop = p.scrollHeight;
+  }
+
+  function formatEta(seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) return "正在估算";
+    const total = Math.max(1, Math.round(seconds));
+    const minutes = Math.floor(total / 60);
+    const remain = total % 60;
+    if (minutes <= 0) return remain + " 秒";
+    if (minutes < 60) return minutes + " 分 " + remain + " 秒";
+    const hours = Math.floor(minutes / 60);
+    return hours + " 小时 " + (minutes % 60) + " 分";
+  }
+
+  function estimateEta(percent) {
+    if (!progressStartedAt || percent <= 0 || percent >= 100) return "";
+    const elapsed = (Date.now() - progressStartedAt) / 1000;
+    return formatEta((elapsed / percent) * (100 - percent));
+  }
+
+  function resetProgress() {
+    progressStartedAt = Date.now();
+    const root = document.querySelector("[data-anima-fast-progress]");
+    if (!root) return;
+    root.hidden = false;
+    const bar = root.querySelector("[data-anima-fast-progress-bar]");
+    const text = root.querySelector("[data-anima-fast-progress-text]");
+    const meta = root.querySelector("[data-anima-fast-progress-meta]");
+    if (bar) bar.style.width = "0%";
+    if (text) text.textContent = "准备安装";
+    if (meta) meta.textContent = "0% · 预计剩余：正在估算";
+  }
+
+  function updateProgress(event) {
+    const root = document.querySelector("[data-anima-fast-progress]");
+    if (!root || !event) return;
+    root.hidden = false;
+    const percent = Math.max(0, Math.min(100, Number(event.percent || 0)));
+    const bar = root.querySelector("[data-anima-fast-progress-bar]");
+    const text = root.querySelector("[data-anima-fast-progress-text]");
+    const meta = root.querySelector("[data-anima-fast-progress-meta]");
+    if (bar) bar.style.width = percent + "%";
+    if (text) text.textContent = event.message || event.phase || "安装中";
+    if (meta) {
+      const eta = event.eta_seconds != null ? formatEta(Number(event.eta_seconds)) : estimateEta(percent);
+      meta.textContent = percent + "% · 阶段：" + (event.phase || "unknown") + (eta ? " · 预计剩余：" + eta : "");
+    }
+  }
+
+  function showFastTrainBlockedNotice() {
+    if (!isFastPage()) return;
+    const message = "Anima Fast dependencies are not ready yet. Please install the plugin first.";
+    appendLog("[blocked] " + message);
+    q("[data-anima-fast-status]").forEach(function (n) {
+      n.textContent = message;
+      n.title = message;
+    });
   }
 
   function formatFastRunFail(json) {
@@ -353,7 +413,9 @@
     try {
       const r = await fetch("/api/plugins/anima-lora/status");
       const j = await r.json();
-      apply(Object.assign({ feature_enabled: true }, j.data || { state: "unknown" }));
+      const d = Object.assign({ feature_enabled: true }, j.data || { state: "unknown" });
+      apply(d);
+      maybeReconnectInstallLog(d);
     } catch (e) {
       const n = document.querySelector("[data-anima-fast-status]");
       if (n) n.textContent = "状态检查失败";
@@ -410,6 +472,44 @@
       }
       status();
     };
+  }
+
+  function openProgress(url) {
+    if (!url || !window.EventSource) return;
+    if (progressEs) progressEs.close();
+    progressEs = new EventSource(url);
+    progressEs.onmessage = function (e) {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === "progress") updateProgress(d);
+        if (d.done || d.type === "done") {
+          if (progressEs) {
+            progressEs.close();
+            progressEs = null;
+          }
+        }
+      } catch (_) {
+        appendLog("[progress] " + e.data);
+      }
+    };
+    progressEs.onerror = function () {
+      appendLog("[progress] stream disconnected");
+      if (progressEs) {
+        progressEs.close();
+        progressEs = null;
+      }
+    };
+  }
+
+  function maybeReconnectInstallLog(d) {
+    const taskId = d && d.facts && d.facts.task_id;
+    if (!taskId || reconnectedInstallTask === taskId) return;
+    if (d.state !== "installing" && d.state !== "auditing") return;
+    reconnectedInstallTask = taskId;
+    resetProgress();
+    appendLog("[log] reconnecting install task " + taskId);
+    openLog("/api/plugins/anima-lora/install/log/stream/" + taskId);
+    openProgress("/api/plugins/anima-lora/install/progress/stream/" + taskId);
   }
 
   function initGuideToggle() {
@@ -485,6 +585,7 @@
       logEl.hidden = false;
       logEl.textContent = "";
     }
+    resetProgress();
     if (statusEl) statusEl.textContent = "安装任务启动中";
 
     try {
@@ -503,6 +604,7 @@
       if (d.already_ready) {
         last = Object.assign({ feature_enabled: true }, d.status || last, { state: "ready" });
         apply(last);
+        updateProgress({ type: "progress", phase: "ready", percent: 100, message: "Anima Fast plugin already ready" });
         appendLog("[skip] Anima Fast plugin already ready; no dependency install needed");
         return;
       }
@@ -512,6 +614,11 @@
         d.log_stream ||
           d.log_stream_url ||
           (d.task_id ? "/api/plugins/anima-lora/install/log/stream/" + d.task_id : "")
+      );
+      openProgress(
+        d.progress_stream ||
+          d.progress_stream_url ||
+          (d.task_id ? "/api/plugins/anima-lora/install/progress/stream/" + d.task_id : "")
       );
       if (tmr) clearInterval(tmr);
       tmr = setInterval(status, 2000);
@@ -542,6 +649,13 @@
         e.preventDefault();
         e.stopPropagation();
         appendLog("[warning] " + (disabledItem.getAttribute("data-anima-fast-disabled-reason") || "该选项当前不可用"));
+        return;
+      }
+      const gatedTrain = e.target && e.target.closest && e.target.closest('[data-anima-fast-train-gated="1"]');
+      if (gatedTrain) {
+        e.preventDefault();
+        e.stopPropagation();
+        showFastTrainBlockedNotice();
         return;
       }
       markUnavailableDropdownOptions();
