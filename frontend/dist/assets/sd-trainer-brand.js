@@ -115,6 +115,13 @@
     document.head.appendChild(script);
   }
 
+  document.addEventListener("click", function (ev) {
+    const link = ev.target && ev.target.closest && ev.target.closest("[data-guide-fast-link]");
+    if (!link) return;
+    ev.preventDefault();
+    window.location.assign("/help/guide.html#anima-fast-lora");
+  });
+
   async function boot() {
     const version = (await fetchVersion()) || versionFromScriptTag();
     if (!version) return;
