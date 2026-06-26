@@ -70,7 +70,7 @@ ANIMA_OPTIMIZER_IMPORTS = [
 ]
 
 # Constraints pin versions but do not install these; uv must receive explicit targets.
-ANIMA_EXTRA_PIP_TARGETS = ("optimum-quanto>=0.2.0",)
+ANIMA_EXTRA_PIP_TARGETS = ("iopath==0.1.10", "optimum-quanto>=0.2.0")
 
 
 def anima_pip_dependency_targets() -> list[str]:
@@ -159,6 +159,17 @@ class AuditResult:
 
 
 LogFn = Callable[[str], None]
+ProgressFn = Callable[[dict], None]
+
+INSTALL_PROGRESS_PHASES = {
+    "source": 5,
+    "python": 20,
+    "venv": 35,
+    "dependencies": 70,
+    "audit": 90,
+    "ready": 100,
+    "broken": 90,
+}
 
 
 def _resolve_child(root: Path, child: Path) -> Path:
@@ -202,6 +213,22 @@ def build_environment_install_plan(
 
 def _append(log: LogFn, line: str) -> None:
     log(line)
+
+
+def _emit_progress(progress: ProgressFn | None, phase: str, message: str, percent: int | None = None, **extra) -> None:
+    if not progress:
+        return
+    event = {
+        "type": "progress",
+        "phase": phase,
+        "percent": int(percent if percent is not None else INSTALL_PROGRESS_PHASES.get(phase, 0)),
+        "message": message,
+    }
+    event.update({key: value for key, value in extra.items() if value is not None})
+    try:
+        progress(event)
+    except Exception:
+        pass
 
 
 def _replace_flash_attn_dependency(source_root: Path, platform_marker: str, replacement: str, log: LogFn) -> list[str]:
@@ -350,8 +377,28 @@ def _find_base_python(plan: EnvironmentInstallPlan) -> Path:
     return plan.base_python
 
 
-def install_environment(plan: EnvironmentInstallPlan, log: LogFn = print) -> AuditResult:
-    facts = {"plan": plan.as_dict(), "phase": "source"}
+def _install_task_id_from_state(layout: ExtensionLayout) -> str | None:
+    if not layout.install_state.is_file():
+        return None
+    try:
+        payload = json.loads(layout.install_state.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    task_id = (payload.get("facts") or {}).get("task_id")
+    return str(task_id) if task_id else None
+
+
+def install_environment(
+    plan: EnvironmentInstallPlan,
+    log: LogFn = print,
+    task_id: str | None = None,
+    progress: ProgressFn | None = None,
+) -> AuditResult:
+    task_id = task_id or _install_task_id_from_state(plan.layout)
+    facts: dict = {"plan": plan.as_dict(), "phase": "source"}
+    if task_id:
+        facts["task_id"] = task_id
+    _emit_progress(progress, "source", "Preparing Anima Fast runtime source")
     write_install_state(plan.layout, STATE_INSTALLING, facts, "copying Anima source snapshot")
     _append(log, "[phase] copy source snapshot")
     if plan.source_commit:
@@ -371,6 +418,7 @@ def install_environment(plan: EnvironmentInstallPlan, log: LogFn = print) -> Aud
 
     uv = _uv_command()
     facts["phase"] = "python"
+    _emit_progress(progress, "python", "Installing or locating Python 3.13 runtime")
     write_install_state(plan.layout, STATE_INSTALLING, facts, "preparing Python 3.13 runtime")
     base_python = _find_base_python(plan)
     if not base_python.is_file():
@@ -390,6 +438,7 @@ def install_environment(plan: EnvironmentInstallPlan, log: LogFn = print) -> Aud
         _append(log, f"[skip] Python runtime exists: {base_python}")
 
     facts["phase"] = "venv"
+    _emit_progress(progress, "venv", "Creating Anima extension virtual environment")
     write_install_state(plan.layout, STATE_INSTALLING, facts, "creating Anima extension venv")
     if not plan.venv_python.is_file():
         plan.venv_python.parent.parent.mkdir(parents=True, exist_ok=True)
@@ -398,6 +447,7 @@ def install_environment(plan: EnvironmentInstallPlan, log: LogFn = print) -> Aud
         _append(log, f"[skip] Anima venv exists: {plan.venv_python}")
 
     facts["phase"] = "dependencies"
+    _emit_progress(progress, "dependencies", "Installing Anima Fast Python dependencies")
     write_install_state(plan.layout, STATE_INSTALLING, facts, "installing Anima dependencies")
     pip_targets = [*anima_pip_dependency_targets(), str(plan.layout.source)]
     _run_streaming(
@@ -427,6 +477,7 @@ def install_environment(plan: EnvironmentInstallPlan, log: LogFn = print) -> Aud
     )
 
     facts["phase"] = "audit"
+    _emit_progress(progress, "audit", "Auditing Anima Fast environment")
     write_install_state(plan.layout, STATE_AUDITING, facts, "auditing Anima environment")
     result = audit_environment(plan.project_root, plan.layout, main_python=Path(sys.executable), require_cuda=True)
     plan.layout.audit_result.write_text(json.dumps(result.as_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
@@ -435,9 +486,11 @@ def install_environment(plan: EnvironmentInstallPlan, log: LogFn = print) -> Aud
     final_facts["audit"] = result.as_dict()
     if result.ok:
         write_install_state(plan.layout, STATE_READY, final_facts, "audit passed")
+        _emit_progress(progress, "ready", "Anima Fast environment is ready", percent=100, state="ready")
         _append(log, "[ready] Anima Fast core trainable dependencies verified (masking extras like sam3 install on demand)")
     else:
         write_install_state(plan.layout, STATE_BROKEN, final_facts, "; ".join(result.errors))
+        _emit_progress(progress, "broken", "Anima Fast environment audit failed", state="broken")
         _append(log, "[broken] Anima Fast environment audit failed")
     return result
 
@@ -670,6 +723,9 @@ def start_install_task(
         def log(line: str) -> None:
             train_log_hub.append_line(task_id, line)
 
+        def progress(event: dict) -> None:
+            train_log_hub.append_event(task_id, event)
+
         try:
             log("[start] Anima Fast plugin installation")
             from .source_root import ensure_install_source_ready
@@ -679,7 +735,7 @@ def start_install_task(
             )
             if resolved_source != plan.source_root:
                 plan = replace(plan, source_root=resolved_source)
-            result = install_environment(plan, log)
+            result = install_environment(plan, log, task_id=task_id, progress=progress)
             task.metadata["audit"] = result.as_dict()
             task.finish_log_only(0 if result.ok else 1, None if result.ok else "; ".join(result.errors))
         except (Exception, KeyboardInterrupt) as exc:  # install failures must become observable state
@@ -689,4 +745,9 @@ def start_install_task(
             task.finish_log_only(1, exc)
 
     threading.Thread(target=runner, daemon=True).start()
-    return task_id, {"task_id": task_id, "plan": plan.as_dict(), "log_stream": f"/api/plugins/anima-lora/install/log/stream/{task_id}"}
+    return task_id, {
+        "task_id": task_id,
+        "plan": plan.as_dict(),
+        "log_stream": f"/api/plugins/anima-lora/install/log/stream/{task_id}",
+        "progress_stream": f"/api/plugins/anima-lora/install/progress/stream/{task_id}",
+    }

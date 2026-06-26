@@ -222,7 +222,7 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
             layout = ExtensionLayout(project / "extensions" / "anima_lora")
             attempts = {"count": 0}
 
-            def fake_install(plan, log):
+            def fake_install(plan, log, task_id=None, progress=None):
                 attempts["count"] += 1
                 self._make_runtime_source(layout)
                 layout.venv_python.parent.mkdir(parents=True, exist_ok=True)
@@ -465,6 +465,7 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
         for name, version in ANIMA_OPTIMIZER_PACKAGES.items():
             self.assertIn(f"{name}=={version}", targets)
         self.assertIn("optimum-quanto>=0.2.0", targets)
+        self.assertIn("iopath==0.1.10", targets)
 
     def test_install_environment_pip_install_includes_explicit_optimizer_targets(self):
         with tempfile.TemporaryDirectory() as td:
@@ -500,7 +501,75 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
         self.assertIn("bitsandbytes==0.49.2", pip_cmd)
         self.assertIn("dadaptation==3.1", pip_cmd)
         self.assertIn("optimum-quanto>=0.2.0", pip_cmd)
+        self.assertIn("iopath==0.1.10", pip_cmd)
         self.assertEqual(pip_cmd[-1], str(layout.source))
+
+    def test_install_environment_broken_progress_does_not_report_complete(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = Path(td)
+            source = self._make_source(project)
+            self._make_constraints(project)
+            layout = ExtensionLayout(project / "extensions" / "anima_lora")
+            plan = build_environment_install_plan(project, layout, source, dry_run=False)
+            discovered_python = plan.python_install_dir / "cpython-3.13.99-windows-x86_64-none" / "python.exe"
+            progress_events: list[dict] = []
+
+            def fake_run(command, cwd, log, env=None, retries=0):
+                if len(command) >= 3 and command[0] == str(discovered_python) and command[1:3] == ["-m", "venv"]:
+                    plan.venv_python.parent.mkdir(parents=True)
+                    plan.venv_python.write_text("", encoding="utf-8")
+                if len(command) >= 3 and command[1:3] == ["python", "install"]:
+                    discovered_python.parent.mkdir(parents=True)
+                    discovered_python.write_text("", encoding="utf-8")
+
+            with mock.patch("mikazuki.anima_fast_backend.environment._uv_command", return_value="uv"), \
+                mock.patch("mikazuki.anima_fast_backend.environment.copy_source_snapshot"), \
+                mock.patch("mikazuki.anima_fast_backend.environment._run_streaming", side_effect=fake_run), \
+                mock.patch(
+                    "mikazuki.anima_fast_backend.environment.audit_environment",
+                    return_value=AuditResult(ok=False, errors=["anima: iopath expected 0.1.10, got None"]),
+                ):
+                install_environment(plan, lambda _line: None, progress=progress_events.append)
+
+        self.assertEqual(progress_events[-1]["phase"], "broken")
+        self.assertLess(progress_events[-1]["percent"], 100)
+
+    def test_install_environment_preserves_task_id_in_install_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = Path(td)
+            source = self._make_source(project)
+            self._make_constraints(project)
+            layout = ExtensionLayout(project / "extensions" / "anima_lora")
+            plan = build_environment_install_plan(project, layout, source, dry_run=False)
+            write_install_state(layout, STATE_INSTALLING, {"task_id": "anima-install-keep-id", "plan": plan.as_dict()})
+
+            discovered_python = plan.python_install_dir / "cpython-3.13.99-windows-x86_64-none" / "python.exe"
+
+            def fake_run(command, cwd, log, env=None, retries=0):
+                if len(command) >= 3 and command[0] == str(discovered_python) and command[1:3] == ["-m", "venv"]:
+                    plan.venv_python.parent.mkdir(parents=True)
+                    plan.venv_python.write_text("", encoding="utf-8")
+                if len(command) >= 3 and command[1:3] == ["python", "install"]:
+                    discovered_python.parent.mkdir(parents=True)
+                    discovered_python.write_text("", encoding="utf-8")
+                log("[fake] command completed")
+
+            def fake_copy(_plan):
+                self._make_runtime_source(layout)
+
+            with mock.patch("mikazuki.anima_fast_backend.environment._uv_command", return_value="uv"), \
+                mock.patch("mikazuki.anima_fast_backend.environment.copy_source_snapshot", side_effect=fake_copy), \
+                mock.patch("mikazuki.anima_fast_backend.environment._run_streaming", side_effect=fake_run), \
+                mock.patch(
+                    "mikazuki.anima_fast_backend.environment.audit_environment",
+                    return_value=AuditResult(ok=True, facts={"anima": {"torch": "2.11.0+cu130"}}),
+                ):
+                install_environment(plan, lambda _line: None, task_id="anima-install-keep-id")
+
+            payload = json.loads(layout.install_state.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["facts"]["task_id"], "anima-install-keep-id")
+        self.assertEqual(payload["state"], STATE_READY)
 
     def test_stale_installing_without_task_marks_broken(self):
         with tempfile.TemporaryDirectory() as td:
@@ -545,7 +614,7 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
             (cache / "train.py").write_text("print('cached')\n", encoding="utf-8")
             captured: dict = {}
 
-            def fake_install(plan, log):
+            def fake_install(plan, log, task_id=None, progress=None):
                 captured["source_root"] = plan.source_root
                 from mikazuki.anima_fast_backend.extension_state import write_install_state
 
