@@ -18,9 +18,9 @@ HELPER = (
     'if(data.result==="reject"){ElMessage.error((data.errors||["\\u5bfc\\u5165\\u5931\\u8d25"]).join("\\n"));return!1}'
     'if(data.result==="redirect"){try{await ElMessageBox.confirm(data.message,"\\u914d\\u7f6e\\u7c7b\\u578b\\u4e0d\\u5339\\u914d",{confirmButtonText:"\\u8df3\\u8f6c\\u5e76\\u5bfc\\u5165",cancelButtonText:"\\u53d6\\u6d88",type:"warning"});sessionStorage.setItem("mikazuki-pending-import",JSON.stringify(data.config));location.href=data.target_path;return!1}catch(e){ElMessage.info("\\u5df2\\u53d6\\u6d88\\u5bfc\\u5165");return!1}}'
     "const cfg=data.config||k;"
-    "let U=findChangedDataBySchema(cfg,schemaFn);"
+    "let U=findChangedDataBySchema(clone(cfg),schemaFn);"
     "if(data.forced_train_type)U.model_train_type=data.forced_train_type;"
-    "if(fullReplace){let applied=Object.assign({},schemaFn(),cfg);if(data.forced_train_type)applied.model_train_type=data.forced_train_type;a.value=applied}else merge?a.value==null?a.value=clone(U):a.value=Object.assign({},a.value,U):a.value=U;"
+    "if(fullReplace){let applied=Object.assign({},schemaFn(),U);if(data.forced_train_type)applied.model_train_type=data.forced_train_type;a.value=applied}else merge?a.value==null?a.value=clone(U):a.value=Object.assign({},a.value,U):a.value=U;"
     "if(data.notice)ElMessage.info({message:data.notice,duration:8e3});"
     'if(successMsg)ElMessage.success(successMsg);else if(data.message&&data.result==="ok")ElMessage.success(data.message);'
     "return!0}"
@@ -103,7 +103,8 @@ OLD_HELPER = (
     "let U=findChangedDataBySchema(cfg,schemaFn);"
     "if(data.forced_train_type)U.model_train_type=data.forced_train_type;"
     "if(fullReplace){let applied=Object.assign({},schemaFn(),cfg);if(data.forced_train_type)applied.model_train_type=data.forced_train_type;a.value=applied}else merge?a.value==null?a.value=clone(U):a.value=Object.assign({},a.value,U):a.value=U;"
-    'if(successMsg)ElMessage.success(successMsg);'
+    "if(data.notice)ElMessage.info({message:data.notice,duration:8e3});"
+    'if(successMsg)ElMessage.success(successMsg);else if(data.message&&data.result==="ok")ElMessage.success(data.message);'
     "return!0}"
 )
 
@@ -112,6 +113,16 @@ UPGRADE_REPLACEMENTS: list[tuple[str, str, str]] = [
         "helper body",
         OLD_HELPER,
         HELPER,
+    ),
+    (
+        "config import clones validation input",
+        "let U=findChangedDataBySchema(cfg,schemaFn);",
+        "let U=findChangedDataBySchema(clone(cfg),schemaFn);",
+    ),
+    (
+        "config import full replace uses normalized values",
+        "if(fullReplace){let applied=Object.assign({},schemaFn(),cfg);",
+        "if(fullReplace){let applied=Object.assign({},schemaFn(),U);",
     ),
     (
         "file import accept json + full replace",
