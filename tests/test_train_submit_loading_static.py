@@ -36,6 +36,22 @@ class TrainSubmitLoadingStaticTests(unittest.TestCase):
         self.assertIn('if(typeof v!=="number"||Number.isNaN(v))continue;', layout)
         self.assertIn("let r=v.toExponential()", layout)
 
+    def test_config_import_validation_does_not_mutate_full_replace_source(self):
+        layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("let U=findChangedDataBySchema(clone(cfg),schemaFn);", layout)
+        self.assertNotIn("let U=findChangedDataBySchema(cfg,schemaFn);", layout)
+
+    def test_config_import_full_replace_applies_schema_normalized_values(self):
+        layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Object.assign({},schemaFn(),U)", layout)
+        self.assertNotIn("Object.assign({},schemaFn(),cfg)", layout)
+
     def test_patch_script_replaces_unsafe_parse_params_re_float_formatting(self):
         label, old, new = next(
             item
