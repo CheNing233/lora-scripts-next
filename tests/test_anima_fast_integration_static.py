@@ -91,6 +91,31 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertNotIn('t === "导入配置文件"', disabled_controls)
         self.assertNotIn('t === "Import config"', disabled_controls)
 
+    def test_fast_install_log_uses_compact_height(self):
+        expected = "max-height:140px"
+        files = (
+            Path("scripts/patch-anima-fast-entry.py"),
+            Path("frontend/dist/assets/anima-fast.html.page.js"),
+            Path("frontend/dist/lora/anima-fast.html"),
+        )
+
+        for path in files:
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("data-anima-fast-log", text, path)
+            self.assertIn(expected, text, path)
+            self.assertNotIn("max-height:260px", text, path)
+
+    def test_frontend_dist_uses_project_version_cache_bust(self):
+        version = Path("VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(version, "2.8.2")
+
+        for path in Path("frontend/dist").rglob("*.html"):
+            html = path.read_text(encoding="utf-8")
+            if "sd-trainer-brand.js" in html:
+                self.assertIn(f"sd-trainer-brand.js?v={version}", html, path)
+            if "sd-nav-i18n.js" in html:
+                self.assertIn(f"sd-nav-i18n.js?v={version}", html, path)
+
     def test_benchmark_example_configs_exist(self):
         examples = Path("docs/examples")
         for name in (

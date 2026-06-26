@@ -18,6 +18,8 @@
 
 
 
+
+
 /* ========== SD-Trainer UI polish (2026-05-21) ========== */
 /* 秋叶原版色系：白/浅灰两层 + 圆角与按钮层次打磨 */
 /* See frontend/DESIGN-training-params-ui.md */
@@ -2101,6 +2103,11 @@ body.anima-fast-page .example-container > .right-container > section:first-of-ty
 body.anima-fast-page .example-container > .right-container > section:first-of-type .el-scrollbar__wrap {
   overflow: visible !important;
   max-height: none !important;
+}
+
+body.anima-fast-page [data-anima-fast-log] {
+  max-height: 140px !important;
+  margin: 8px 0 10px 0 !important;
 }
 
 .example-container > .right-container .anima-fast-intro-wrap {
