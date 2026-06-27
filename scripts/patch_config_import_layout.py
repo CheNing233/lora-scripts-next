@@ -231,25 +231,6 @@ PREVIEW_SIGNAL_GUARD_RAW = (
 
 PREVIEW_PATCHES: list[tuple[str, str, str]] = [
     (
-        "parseParams lycoris skip undefined network_args",
-        (
-            'e.network_module=="lycoris.kohya"?(e.network_args=[...e.network_args,'
-            '"conv_dim="+e.conv_dim,"conv_alpha="+e.conv_alpha,"dropout="+e.dropout,'
-            '"algo="+e.lycoris_algo],e.lokr_factor&&e.network_args.push(`factor=${e.lokr_factor}`),'
-            'e.train_norm&&e.network_args.push("train_norm=True"))'
-        ),
-        (
-            'e.network_module=="lycoris.kohya"?((()=>{e.network_args=[];'
-            "const ok=v=>v!=null&&v!==\"\"&&String(v)!==\"undefined\"&&String(v)!==\"null\";"
-            'ok(e.conv_dim)&&e.network_args.push("conv_dim="+e.conv_dim),'
-            'ok(e.conv_alpha)&&e.network_args.push("conv_alpha="+e.conv_alpha),'
-            'ok(e.dropout)&&e.network_args.push("dropout="+e.dropout),'
-            'ok(e.lycoris_algo)&&e.network_args.push("algo="+e.lycoris_algo),'
-            'ok(e.lokr_factor)&&e.network_args.push("factor="+e.lokr_factor),'
-            'e.train_norm&&e.network_args.push("train_norm=True")})())'
-        ),
-    ),
-    (
         "needDeleteParams drop enable_preview",
         '"enable_block_weights","enable_preview","network_args_custom"',
         '"enable_block_weights","network_args_custom"',
@@ -285,53 +266,6 @@ PREVIEW_PATCHES: list[tuple[str, str, str]] = [
 ]
 
 
-DOWNLOAD_PATCHES: list[tuple[str, str, str]] = [
-    (
-        "backend export helper before preview pipeline",
-        'computed(()=>{try{return T()}catch(_){console.log(_)}});x=()=>{if(n.value==null',
-        (
-            'computed(()=>{try{return T()}catch(_){console.log(_)}});const mikazukiUsesBackendExport=pt=>pt==="sd3-lora"||pt==="anima-lora"||pt==="anima-finetune",'
-            'mikazukiNormalizeConfigForExport=async(raw,pageTrainType)=>{const resp=await fetch("/api/config/normalize-for-export",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({page_train_type:pageTrainType,config:raw})});'
-            'if(!resp.ok)throw new Error("\\u4e0b\\u8f7d\\u5931\\u8d25\\uff1a\\u7f51\\u7edc\\u9519\\u8bef");'
-            'const payload=await resp.json();if(payload.status!=="success")throw new Error(payload.message||"\\u4e0b\\u8f7d\\u5931\\u8d25");return payload.data},'
-            "x=()=>{if(n.value==null"
-        ),
-    ),
-    (
-        "download uses backend export on anima pages",
-        "E=()=>{const _=x(),g=`${new Date().getTime()}.toml`;P(g,_)}",
-        (
-            'E=async()=>{try{if(mikazukiUsesBackendExport(t)){const data=await mikazukiNormalizeConfigForExport(T(),t);'
-            "P(`${new Date().getTime()}.toml`,stringify(data.config));return}"
-            "P(`${new Date().getTime()}.toml`,x())}catch(err){console.log(err);"
-            'ElMessage.error(typeof err=="string"?err:err.message||"\\u4e0b\\u8f7d\\u5931\\u8d25")}}'
-        ),
-    ),
-]
-
-
-PREVIEW_OVERLAY_MARKER = "backendPreview=ref("
-
-PREVIEW_OVERLAY_PATCHES: list[tuple[str, str, str]] = [
-    (
-        "preview overlay keeps x() fallback",
-        'stringify(m)},L=computed(()=>{try{return x()}catch(_){console.log(_)}}),I=()=>{',
-        (
-            'stringify(m)},backendPreview=ref(""),refreshBackendPreview=(()=>{let seq=0;return async()=>{'
-            "if(n.value==null||!mikazukiUsesBackendExport(t)){backendPreview.value=\"\";return}"
-            "const cur=++seq;try{const data=await mikazukiNormalizeConfigForExport(T(),t);"
-            "if(cur!==seq)return;backendPreview.value=stringify(data.config);"
-            "const g=checkParams(data.config);C.value=g.warnings,d.value=g.errors"
-            '}catch(e){if(cur===seq)backendPreview.value=""}}})(),'
-            "scheduleBackendPreview=(()=>{let timer=0;return()=>{timer&&clearTimeout(timer);"
-            "timer=setTimeout(refreshBackendPreview,200)}})(),"
-            "watch([()=>a.value,()=>n.value],scheduleBackendPreview,{deep:!0}),"
-            'L=computed(()=>{try{return backendPreview.value||x()}catch(_){console.log(_)}}),I=()=>{'
-        ),
-    ),
-]
-
-
 def _replace_once(text: str, label: str, old: str, new: str) -> str:
     if old not in text:
         if new in text:
@@ -353,13 +287,6 @@ def main() -> None:
 
     for label, old, new in PREVIEW_PATCHES:
         text = _replace_once(text, label, old, new)
-
-    for label, old, new in DOWNLOAD_PATCHES:
-        text = _replace_once(text, label, old, new)
-
-    if PREVIEW_OVERLAY_MARKER not in text:
-        for label, old, new in PREVIEW_OVERLAY_PATCHES:
-            text = _replace_once(text, label, old, new)
 
     LAYOUT.write_text(text, encoding="utf-8")
     print("patched", LAYOUT, "(upgrade)" if already else "(initial)")

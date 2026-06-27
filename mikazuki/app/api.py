@@ -68,8 +68,6 @@ from mikazuki.tasks import tm
 from mikazuki.train_log_hub import hub as train_log_hub
 from mikazuki.utils import train_utils
 from mikazuki.utils.config_import import validate_config_import
-from mikazuki.utils.config_export import normalize_config_for_export
-from mikazuki.utils.config_args import normalize_custom_args, normalize_kv_arg_list
 from mikazuki.utils.devices import printable_devices
 from mikazuki.portable_utils import flash_attn_stack_usable
 from mikazuki.utils.tk_window import (open_directory_selector,
@@ -134,6 +132,58 @@ def _missing_standard_train_field(field: str, label: str) -> APIResponseFail:
     )
 
 
+def _normalize_kv_arg_list(values) -> list[str]:
+    """Normalize key=value style arg list from UI payload."""
+    if not isinstance(values, list):
+        return []
+
+    ordered: list[str] = []
+    key_index: dict[str, int] = {}
+    for raw in values:
+        if not isinstance(raw, str):
+            continue
+        item = raw.strip()
+        if not item or "=" not in item:
+            continue
+        key, value = item.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+        if value.lower() in {"undefined", "null", "nan"}:
+            continue
+        normalized = f"{key}={value}"
+        if key in key_index:
+            ordered[key_index[key]] = normalized
+        else:
+            key_index[key] = len(ordered)
+            ordered.append(normalized)
+    return ordered
+
+
+def normalize_custom_args(config: dict) -> None:
+    """
+    Apply generic arg normalization for all training types.
+    - Merge *_custom table input into canonical args list
+    - Drop undefined/null entries
+    - Keep last value on duplicate keys
+    """
+    for base_key in ("network_args", "optimizer_args"):
+        custom_key = f"{base_key}_custom"
+        merged: list[str] = []
+        if isinstance(config.get(base_key), list):
+            merged.extend(config.get(base_key) or [])
+        if isinstance(config.get(custom_key), list):
+            merged.extend(config.get(custom_key) or [])
+
+        normalized = _normalize_kv_arg_list(merged)
+        if normalized:
+            config[base_key] = normalized
+        else:
+            config.pop(base_key, None)
+        config.pop(custom_key, None)
+
+
 def _is_invalid_value(value) -> bool:
     """Check if a value is invalid and should be stripped before writing TOML."""
     if value is None:
@@ -168,7 +218,7 @@ def sanitize_config(config: dict) -> None:
         del config[k]
     for key in ("network_args", "optimizer_args"):
         if isinstance(config.get(key), list):
-            config[key] = normalize_kv_arg_list(config[key])
+            config[key] = _normalize_kv_arg_list(config[key])
     for key in _PATH_FIELDS:
         if isinstance(config.get(key), str):
             config[key] = config[key].replace("\\", "/")
@@ -590,33 +640,6 @@ async def validate_import_config(request: Request):
 
     result = validate_config_import(page_train_type, config)
     return APIResponseSuccess(data=result)
-
-
-@router.post("/config/normalize-for-export")
-async def normalize_export_config(request: Request):
-    """Normalize form config for export/download TOML (Anima uses adapt_anima_config)."""
-    try:
-        payload = json.loads(await request.body())
-    except json.JSONDecodeError:
-        return APIResponseFail(message="请求体必须是 JSON")
-
-    page_train_type = payload.get("page_train_type")
-    config = payload.get("config")
-    if not page_train_type or not isinstance(page_train_type, str):
-        return APIResponseFail(message="缺少 page_train_type")
-    if not isinstance(config, dict):
-        return APIResponseFail(message="缺少 config 对象")
-
-    try:
-        cfg, warnings = normalize_config_for_export(
-            config,
-            page_train_type=page_train_type,
-        )
-    except Exception as exc:
-        log.exception("normalize-for-export failed")
-        return APIResponseFail(message=f"预览配置失败: {exc}")
-
-    return APIResponseSuccess(data={"config": cfg, "warnings": warnings})
 
 
 @router.post("/run")

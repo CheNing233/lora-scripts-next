@@ -158,7 +158,7 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
 
     def test_frontend_dist_uses_project_version_cache_bust(self):
         version = Path("VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(version, "2.8.3")
+        self.assertEqual(version, "2.8.2")
 
         for path in Path("frontend/dist").rglob("*.html"):
             html = path.read_text(encoding="utf-8")

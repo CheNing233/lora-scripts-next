@@ -13,8 +13,8 @@ set "BASE_DIR=%PORTABLE_ROOT%"
 set "HF_HOME=%PORTABLE_ROOT%huggingface"
 set "MIKAZUKI_TAGGER_MODELS_DIR=%PORTABLE_ROOT%tagger-models"
 set "MIKAZUKI_TOKENIZER_CACHE_DIR=%PORTABLE_ROOT%tokenizer-cache"
-:: Bundled tagger-models/tokenizer-cache first; do not force ModelScope (WD taggers are HF-only).
-if not defined MIKAZUKI_HUB_BACKEND set "MIKAZUKI_HUB_BACKEND=auto"
+set "MIKAZUKI_HUB_BACKEND=modelscope"
+if not defined HF_ENDPOINT set "HF_ENDPOINT=https://hf-mirror.com"
 set "PYTHONUTF8=1"
 set "PYTHON_EXE=%PORTABLE_ROOT%python_embeded\python.exe"
 set "LOG_FILE=%PORTABLE_ROOT%sd-trainer-log.txt"
@@ -62,11 +62,6 @@ echo [setup] OK >> "%LOG_FILE%"
 cd /d "%PORTABLE_ROOT%SD-Trainer"
 if errorlevel 1 goto :no_project
 
-if exist "scripts\portable\link_portable_data_dirs.py" (
-    echo [portable] Linking sd-models/output/train into SD-Trainer for file picker >> "%LOG_FILE%"
-    "%PYTHON_EXE%" -s scripts\portable\link_portable_data_dirs.py >> "%LOG_FILE%" 2>&1
-)
-
 if exist "scripts\prefetch_default_tagger.py" (
     echo [tagger] Ensuring default WD tagger cache >> "%LOG_FILE%"
     "%PYTHON_EXE%" -s scripts\prefetch_default_tagger.py --if-missing --tagger-models-dir "%MIKAZUKI_TAGGER_MODELS_DIR%" >> "%LOG_FILE%" 2>&1
@@ -80,10 +75,9 @@ if exist "scripts\prefetch_sdxl_tokenizer.py" (
 echo [launch] Starting gui.py >> "%LOG_FILE%"
 echo.
 echo  Starting SD-Trainer...
-echo  运行日志（打标下载进度、错误信息等）将显示在本窗口。
 echo.
 
-"%PYTHON_EXE%" -s -u gui.py --skip-prepare-environment --port 28000 %*
+"%PYTHON_EXE%" -s gui.py --skip-prepare-environment --port 28000 %* 2>> "%LOG_FILE%"
 set "EXIT_CODE=%errorlevel%"
 echo [launch] gui.py exited with code %EXIT_CODE% >> "%LOG_FILE%"
 

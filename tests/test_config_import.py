@@ -161,27 +161,6 @@ class ConfigImportTests(unittest.TestCase):
         self.assertEqual(result["config"]["lokr_factor"], -1)
         self.assertNotIn("weight_deca", result["config"].get("optimizer_args", []))
 
-    def test_lokr627_poisoned_undefined_network_args_sanitized(self):
-        config = {
-            "model_train_type": "anima-lora",
-            "network_module": "lycoris.kohya",
-            "network_args": [
-                "algo=lokr",
-                "conv_dim=undefined",
-                "conv_alpha=undefined",
-                "dropout=undefined",
-                "factor=-1",
-            ],
-        }
-        result = validate_config_import("sd3-lora", config)
-        self.assertEqual(result["result"], "ok")
-        args = result["config"].get("network_args") or []
-        self.assertIn("algo=lokr", args)
-        self.assertIn("factor=-1", args)
-        self.assertFalse(any("undefined" in item for item in args))
-        self.assertEqual(result["config"]["lycoris_algo"], "lokr")
-        self.assertEqual(result["config"]["lokr_factor"], -1)
-
 
 if __name__ == "__main__":
     unittest.main()

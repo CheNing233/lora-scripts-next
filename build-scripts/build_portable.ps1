@@ -642,15 +642,6 @@ foreach ($d in @("sd-models", "output", "logs", "huggingface", "tagger-models", 
     [System.IO.File]::WriteAllText((Join-Path $p ".gitkeep"), "")
 }
 
-$linkScript = Join-Path $sdtDir "scripts\portable\link_portable_data_dirs.py"
-if (Test-Path $linkScript) {
-    Write-Host "  Linking sd-models/output/logs/train into SD-Trainer (file picker)..." -ForegroundColor Green
-    & $pythonExe -s $linkScript --trainer-dir $sdtDir
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  WARNING: portable data-dir junction step failed (exit $LASTEXITCODE)" -ForegroundColor Yellow
-    }
-}
-
 $readme = "SD-Trainer Portable`r`n"
 $readme += "===================`r`n`r`n"
 $readme += "Quick Start:`r`n"
@@ -667,8 +658,8 @@ $readme += "  run_gui.bat      - Stable entrypoint for portable users`r`n"
 $readme += "  run_gui_portable.bat - Legacy shim (logic in SD-Trainer/scripts/portable/)`r`n"
 $readme += "  python_embeded/  - Python runtime`r`n"
 $readme += "  SD-Trainer/      - Project files`r`n"
-$readme += "  sd-models/       - Put your models here (also linked as SD-Trainer\\sd-models for file picker)`r`n"
-$readme += "  output/          - Training output (linked into SD-Trainer\\output)`r`n"
+$readme += "  sd-models/       - Put your models here`r`n"
+$readme += "  output/          - Training output`r`n"
 $readme += "  logs/            - Logs`r`n`r`n"
 $readme += "  tagger-models/   - Local tagger models`r`n`r`n"
 $readme += "Update:`r`n"
