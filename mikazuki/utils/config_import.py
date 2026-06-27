@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from mikazuki.utils.train_utils import ensure_enable_preview_flag
+
 ANIMA_TRAIN_TYPES = frozenset({"anima-lora", "sd3-lora"})
 FLUX_TRAIN_TYPES = frozenset({"flux-lora", "flux-finetune"})
 LUMINA_TRAIN_TYPES = frozenset({"lumina-lora"})
@@ -95,6 +97,12 @@ TRAIN_TYPE_ALIASES = {
 }
 
 PAGE_SPECS: dict[str, dict[str, Any]] = {
+    "anima-lora": {
+        "label": "Anima LoRA 训练",
+        "path": "/lora/sd3.html",
+        "accepted": ANIMA_TRAIN_TYPES,
+        "default_train_type": "anima-lora",
+    },
     "sd3-lora": {
         "label": "Anima LoRA 训练",
         "path": "/lora/sd3.html",
@@ -335,6 +343,13 @@ def _resolve_page_spec(page_train_type: str) -> dict[str, Any] | None:
     return PAGE_SPECS.get(normalized) or PAGE_SPECS.get(page_train_type)
 
 
+def _finalize_import_config(config: dict) -> dict:
+    """Apply cross-page normalizers for imported GUI configs."""
+    normalized = copy.deepcopy(config)
+    ensure_enable_preview_flag(normalized)
+    return normalized
+
+
 def _normalize_for_page(config: dict, page_spec: dict[str, Any], config_type: str | None) -> dict:
     normalized = copy.deepcopy(config)
     default_type = page_spec.get("default_train_type")
@@ -347,7 +362,7 @@ def _normalize_for_page(config: dict, page_spec: dict[str, Any], config_type: st
     elif config_type:
         normalized["model_train_type"] = config_type
 
-    return normalized
+    return _finalize_import_config(normalized)
 
 
 def _format_reasons(reasons: list[str], limit: int = 4) -> str:
@@ -456,7 +471,7 @@ def validate_config_import(page_train_type: str, config: dict) -> dict[str, Any]
     if page_spec is None:
         return {
             "result": "ok",
-            "config": copy.deepcopy(config),
+            "config": _finalize_import_config(config),
             "message": "当前页面未配置导入校验规则，已允许导入",
         }
 
@@ -542,7 +557,7 @@ def validate_config_import(page_train_type: str, config: dict) -> dict[str, Any]
     target_label = target["label"]
     return {
         "result": "redirect",
-        "config": copy.deepcopy(config),
+        "config": _finalize_import_config(config),
         "target_path": target["path"],
         "target_label": target_label,
         "config_train_type": config_type,

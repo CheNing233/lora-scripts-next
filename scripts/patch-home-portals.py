@@ -124,9 +124,9 @@ def write_guide_assets() -> None:
     tpl = (DIST / "other/changelog.html").read_text(encoding="utf-8")
     g = tpl.replace("/other/changelog.md", "/help/guide.md")
     g = g.replace("更新日志", "新手上路", 2)
+    g = g.replace("changelog.html.a1b2c3d4.js", "guide.html.b8e2d701.js")
+    g = g.replace("changelog.html.e5f6a7b8.js", "guide.html.c3f4a902.js")
     g = g.replace("changelog.html", "guide.html")
-    g = g.replace("changelog.html.a1b2c3d4", "guide.html.b8e2d701")
-    g = g.replace("changelog.html.e5f6a7b8", "guide.html.c3f4a902")
     a = g.find('<div class="sd-guide')
     if a < 0:
         a = g.find("<h2 id=")

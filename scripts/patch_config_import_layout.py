@@ -173,6 +173,58 @@ UPGRADE_REPLACEMENTS: list[tuple[str, str, str]] = [
     ),
 ]
 
+PREVIEW_SIGNAL_KEYS = (
+    '["prompt_file","sample_width","sample_height","sample_cfg","sample_seed","sample_steps",'
+    '"sample_sampler","randomly_choice_prompt","sample_at_first","sample_every_n_epochs",'
+    '"sample_every_n_steps","positive_prompts","negative_prompts","sample_prompts"]'
+)
+
+PREVIEW_SIGNAL_GUARD_E = (
+    f"{PREVIEW_SIGNAL_KEYS}.some(r=>r in e&&e[r]!==\"\"&&e[r]!=null&&e[r]!==undefined"
+    "&&(!Array.isArray(e[r])||e[r].length))"
+)
+
+PREVIEW_SIGNAL_GUARD_RAW = (
+    f"{PREVIEW_SIGNAL_KEYS}.some(r=>r in _&&_[r]!==\"\"&&_[r]!=null&&_[r]!==undefined"
+    "&&(!Array.isArray(_[r])||_[r].length))"
+)
+
+PREVIEW_PATCHES: list[tuple[str, str, str]] = [
+    (
+        "needDeleteParams drop enable_preview",
+        '"enable_block_weights","enable_preview","network_args_custom"',
+        '"enable_block_weights","network_args_custom"',
+    ),
+    (
+        "parseParams safe network_args spread",
+        "e.network_args=[...e.network_args,...e.network_args_custom]",
+        "e.network_args=[...(e.network_args||[]),...e.network_args_custom]",
+    ),
+    (
+        "parseParams safe optimizer_args spread",
+        "e.optimizer_args=[...e.optimizer_args,...e.optimizer_args_custom]",
+        "e.optimizer_args=[...(e.optimizer_args||[]),...e.optimizer_args_custom]",
+    ),
+    (
+        "parseParams infer enable_preview from legacy preview fields",
+        "e.optimizer_args=[...(e.optimizer_args||[]),...e.optimizer_args_custom]),e.enable_preview||(delete e.sample_prompts,delete e.sample_sampler,delete e.sample_every_n_epochs)",
+        f"e.optimizer_args=[...(e.optimizer_args||[]),...e.optimizer_args_custom]),({PREVIEW_SIGNAL_GUARD_E})&&(e.enable_preview=!0),e.enable_preview||(delete e.sample_prompts,delete e.sample_sampler,delete e.sample_every_n_epochs)",
+    ),
+    (
+        "T() preview schema backfill",
+        "T=()=>{let _=a.value;w.forEach(g=>{_&&_.hasOwnProperty(g)&&_[g]!=null&&(_[g]=_[g].map(N=>N||\"\"))});let m=n.value(_);return w.forEach(g=>{m.hasOwnProperty(g)&&m[g].length==0&&delete m[g]}),m}",
+        (
+            "T=()=>{let _=clone(a.value);w.forEach(g=>{_&&_.hasOwnProperty(g)&&_[g]!=null&&"
+            "(_[g]=Array.isArray(_[g])?_[g].map(N=>N||\"\"):String(_[g]).split(/\\r?\\n/).filter(N=>N))});"
+            "let m=n.value(_);w.forEach(g=>{Array.isArray(m[g])&&m[g].length==0&&delete m[g]});"
+            f"if(_){{const b={PREVIEW_SIGNAL_KEYS},h={PREVIEW_SIGNAL_GUARD_RAW};"
+            "(_.enable_preview===!0||_.enable_preview===\"true\"||_.enable_preview===1||h)&&"
+            "(m.enable_preview=!0);if(m.enable_preview)for(const r of b)r in _&&m[r]===undefined&&(m[r]=_[r])}"
+            "return m}"
+        ),
+    ),
+]
+
 
 def _replace_once(text: str, label: str, old: str, new: str) -> str:
     if old not in text:
@@ -192,6 +244,9 @@ def main() -> None:
     else:
         for label, old, new in UPGRADE_REPLACEMENTS:
             text = _replace_once(text, label, old, new)
+
+    for label, old, new in PREVIEW_PATCHES:
+        text = _replace_once(text, label, old, new)
 
     LAYOUT.write_text(text, encoding="utf-8")
     print("patched", LAYOUT, "(upgrade)" if already else "(initial)")

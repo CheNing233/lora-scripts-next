@@ -781,13 +781,29 @@ def _escape_js_template(html: str) -> str:
     return html.replace("\\", "\\\\").replace("`", "\\`").replace("\r", "").replace("\n", "")
 
 
+def _fix_guide_html_assets(html: str) -> str:
+    """Ensure guide SSR head preloads point at existing chunk files."""
+    replacements = (
+        ("changelog.html.a1b2c3d4.js", "guide.html.b8e2d701.js"),
+        ("changelog.html.e5f6a7b8.js", "guide.html.c3f4a902.js"),
+        ("guide.html.a1b2c3d4.js", "guide.html.b8e2d701.js"),
+        ("guide.html.e5f6a7b8.js", "guide.html.c3f4a902.js"),
+        ("guide.html.c3f4a902.js.js", "guide.html.c3f4a902.js"),
+        ("guide.html.b8e2d701.js.js", "guide.html.b8e2d701.js"),
+    )
+    for old, new in replacements:
+        html = html.replace(old, new)
+    return html
+
+
 def rebuild_guide_html() -> None:
     guide_html_path = DIST / "help" / "guide.html"
     html = guide_html_path.read_text(encoding="utf-8")
     start = html.index('<div class="sd-guide')
     end = html.index("</div></div><!--[--><!--]--></div><footer", start)
     new_body = build_full_guide_pager_html(compact=True)
-    guide_html_path.write_text(html[:start] + new_body + html[end + len("</div>") :], encoding="utf-8")
+    html = html[:start] + new_body + html[end + len("</div>") :]
+    guide_html_path.write_text(_fix_guide_html_assets(html), encoding="utf-8")
 
 
 def _assert_guide_page_js_valid(source: str, path: Path) -> None:
@@ -818,7 +834,7 @@ def rebuild_guide_page_js() -> None:
     inner = _escape_js_template(build_full_guide_pager_html(compact=True))
     source = (
         'import{_ as n,o as s,c as a,a as e,e as i}from"'
-        + APP_JS_MODULE.lstrip("./")
+        + APP_JS_MODULE
         + '";'
         "const _={},h=i(`"
         + inner
