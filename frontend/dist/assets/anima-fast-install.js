@@ -17,6 +17,9 @@
   let observedPath = location.pathname;
   let progressStartedAt = 0;
   let reconnectedInstallTask = "";
+  let installSessionActive = false;
+  let reloadScheduled = false;
+  const POST_INSTALL_RELOAD_KEY = "anima-fast-post-install-reload";
 
   function q(sel) {
     return Array.from(document.querySelectorAll(sel));
@@ -44,6 +47,15 @@
     const working = d.state === "installing" || d.state === "auditing";
     const ready = d.state === "ready";
     dedupeInstallPanels(ready);
+    q("[data-anima-fast-progress]").forEach(function (root) {
+      root.hidden = ready;
+      root.style.display = ready ? "none" : "";
+    });
+    q("[data-anima-fast-log]").forEach(function (p) {
+      if (!ready) return;
+      p.hidden = true;
+      p.style.display = "none";
+    });
     q("[data-anima-fast-install]").forEach(function (b) {
       b.hidden = ready;
       b.style.display = ready ? "none" : "";
@@ -406,6 +418,34 @@
     const a = last.facts && last.facts.audit;
     if (a && !a.ok && a.errors) appendLog("[audit] " + a.errors.join("; "));
     syncAuditOptionGuards();
+    maybeReloadAfterInstallReady(last);
+  }
+
+  function markInstallSessionActive() {
+    installSessionActive = true;
+    reloadScheduled = false;
+    try {
+      sessionStorage.removeItem(POST_INSTALL_RELOAD_KEY);
+    } catch (_) {}
+  }
+
+  function maybeReloadAfterInstallReady(d) {
+    if (!isFastPage()) return;
+    if (d.state === "installing" || d.state === "auditing") {
+      installSessionActive = true;
+      return;
+    }
+    if (d.state !== "ready" || !installSessionActive || reloadScheduled) return;
+    installSessionActive = false;
+    try {
+      if (sessionStorage.getItem(POST_INSTALL_RELOAD_KEY) === "1") return;
+      sessionStorage.setItem(POST_INSTALL_RELOAD_KEY, "1");
+    } catch (_) {}
+    reloadScheduled = true;
+    appendLog("[ready] 安装完成，正在刷新页面以加载参数预览…");
+    window.setTimeout(function () {
+      location.reload();
+    }, 700);
   }
 
   async function status() {
@@ -487,6 +527,7 @@
             progressEs.close();
             progressEs = null;
           }
+          status();
         }
       } catch (_) {
         appendLog("[progress] " + e.data);
@@ -506,6 +547,7 @@
     if (!taskId || reconnectedInstallTask === taskId) return;
     if (d.state !== "installing" && d.state !== "auditing") return;
     reconnectedInstallTask = taskId;
+    markInstallSessionActive();
     resetProgress();
     appendLog("[log] reconnecting install task " + taskId);
     openLog("/api/plugins/anima-lora/install/log/stream/" + taskId);
@@ -578,6 +620,7 @@
     }
     if (!window.confirm(CONFIRM)) return;
 
+    markInstallSessionActive();
     installBtn.disabled = true;
     const statusEl = document.querySelector("[data-anima-fast-status]");
     const logEl = document.querySelector("[data-anima-fast-log]");
