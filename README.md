@@ -83,9 +83,9 @@ Python **3.10** recommended. See [Flash Attention 2 docs](docs/flash-attention.m
 | **Anima LoRA** | LoRA · LoKr · **T-LoRA** | Flash Attention 2 / xformers / SDPA · from ~12 GB VRAM |
 | **Anima Edit** | Image editing LoRA (experimental) | Maintained on the [`anima-edit`](https://github.com/wochenlong/lora-scripts-next/tree/anima-edit) branch |
 | **Anima LoRA Fast** | LoRA only (plugin) | Optional [anima_lora](https://github.com/sorryhyun/anima_lora) runtime · ~16 GB+ · see [`docs/anima-fast.md`](docs/anima-fast.md) |
-| **Anima Finetune** | Full DiT (`anima_train.py`) | Sidebar **全量微调 → Anima Finetune** · **~24 GB VRAM** (4090-class) |
+| **Anima Finetune** | Full DiT (`anima_train.py`) | Sidebar **Full Finetune → Anima Finetune** · **~24 GB VRAM** (4090-class) |
 | SD 1.5 / SDXL LoRA | LoRA · LoHa · LoKr | xformers / SDPA |
-| SD 1.5 / SDXL Finetune | Dreambooth / SDXL finetune | Sidebar **全量微调 → Stable Diffusion** |
+| SD 1.5 / SDXL Finetune | Dreambooth / SDXL finetune | Sidebar **Full Finetune → Stable Diffusion** |
 | Flux | LoRA | xformers / SDPA |
 
 <p align="center">
@@ -104,7 +104,7 @@ Python **3.10** recommended. See [Flash Attention 2 docs](docs/flash-attention.m
   <img src="assets/readme/screenshot-anima-finetune.png?v=20260528" alt="Anima full finetune UI" width="920" />
 </p>
 
-<p align="center"><sub>Anima Finetune — full DiT weights under <b>全量微调</b> in the sidebar</sub></p>
+<p align="center"><sub>Anima Finetune — full DiT weights under <b>Full Finetune</b> in the sidebar</sub></p>
 
 ---
 
@@ -179,7 +179,7 @@ Automatically opens a monitor page (port 6008) when training starts — GPU stat
 |------|---------|
 | 2026-06-27 | **v2.8.2** — Portable pack: **SDXL training**, **tagging**, **preview images**, **config import** fixes; bundled tagger + SDXL tokenizer cache · see [CHANGELOG.md](CHANGELOG.md) |
 | 2026-05-28 | **v2.7.0** — **Anima LoRA Fast mode** (optional `anima_lora` plugin): WebUI entry, one-click install, train monitor sync, benchmark docs · see [`docs/anima-fast.md`](docs/anima-fast.md) |
-| 2026-05-28 | **v2.6.0** — **Anima full finetune** WebUI (`anima-finetune`), `anima_train.py` wrapper, 全量微调 nav, train monitor label fix; ~24 GB VRAM reference |
+| 2026-05-28 | **v2.6.0** — **Anima full finetune** WebUI (`anima-finetune`), `anima_train.py` wrapper, full finetune nav, train monitor label fix; ~24 GB VRAM reference |
 | 2026-05-27 | **v2.5.3** — Portable dependency health check, sidebar version chip ([#54](https://github.com/wochenlong/lora-scripts-next/issues/54)) |
 | 2026-05-21 | **v2.5.0** — UI refresh: new sidebar navigation, home portal page, training monitor dashboard with GPU metrics; CSS cleanup |
 | 2026-05-21 | **v2.4.0** — Training stability: env isolation, NaN filter, sample guard, attn_mode fallback, path normalization; Portable tkinter fix |
