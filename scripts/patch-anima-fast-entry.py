@@ -5,13 +5,20 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
+
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from spa_asset_cache import SPA_ASSET_CACHE_KEY
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "frontend/dist"
 ASSETS = DIST / "assets"
 APP_JS = ASSETS / "app.547295de.js"
-APP_JS_CACHE_KEY = "20260605-routefix2"
+APP_JS_CACHE_KEY = SPA_ASSET_CACHE_KEY
 APP_JS_MODULE = f"./app.547295de.js?v={APP_JS_CACHE_KEY}"
 
 SOURCE_HTML = DIST / "lora/sd3.html"

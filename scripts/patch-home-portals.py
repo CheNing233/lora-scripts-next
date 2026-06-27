@@ -8,6 +8,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from spa_asset_cache import SPA_ASSET_CACHE_KEY
+
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "frontend/dist"
 ASSETS = DIST / "assets"
@@ -41,7 +47,7 @@ def guide_html_body() -> str:
     return mod.build_full_guide_pager_html(compact=True)
 
 
-GUIDE_APP_IMPORT = "./app.547295de.js?v=20260605-routefix2"
+GUIDE_APP_IMPORT = f"./app.547295de.js?v={SPA_ASSET_CACHE_KEY}"
 
 
 def patch_index_js() -> None:
