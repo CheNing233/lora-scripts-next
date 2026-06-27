@@ -41,7 +41,7 @@
 ## Get Started in 3 Steps
 
 ```
-1. Download  →  SD-Trainer-v2.7.0.7z from [Releases](https://github.com/wochenlong/lora-scripts-next/releases), extract
+1. Download  →  SD-Trainer-v2.8.2.7z from [Releases](https://github.com/wochenlong/lora-scripts-next/releases), extract
 2. Launch    →  Double-click run_gui.bat (auto-installs deps on first run, ~3 GB)
 3. Train     →  Open http://127.0.0.1:28000, pick a model, set params, start training
 ```
@@ -180,6 +180,7 @@ Automatically opens a monitor page (port 6008) when training starts — GPU stat
 
 | Date | Version |
 |------|---------|
+| 2026-06-27 | **v2.8.2** — Portable pack: **SDXL training**, **tagging**, **preview images**, **config import** fixes; bundled tagger + SDXL tokenizer cache · see [CHANGELOG.md](CHANGELOG.md) |
 | 2026-05-28 | **v2.7.0** — **Anima LoRA Fast mode** (optional `anima_lora` plugin): WebUI entry, one-click install, train monitor sync, benchmark docs · see [`docs/anima-fast.md`](docs/anima-fast.md) |
 | 2026-05-28 | **v2.6.0** — **Anima full finetune** WebUI (`anima-finetune`), `anima_train.py` wrapper, 全量微调 nav, train monitor label fix; ~24 GB VRAM reference |
 | 2026-05-27 | **v2.5.3** — Portable dependency health check, sidebar version chip ([#54](https://github.com/wochenlong/lora-scripts-next/issues/54)) |

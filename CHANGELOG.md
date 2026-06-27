@@ -3,6 +3,47 @@
 本文件记录 **wochenlong/lora-scripts-next** 面向镜像与 AutoDL 的发行说明；上游 kohya-ss/sd-scripts 的变更请见其仓库。
 
 ---
+## v2.8.2 — 2026-06-27
+
+### 整合包更新要点
+
+面向 Windows 便携整合包 **SD-Trainer-v2.8.2.7z**（`PORTABLE_BUILD` **`2874ad1`**，约 **392 MB**）。相对 v2.7.0 / 旧版整合包，本版重点修复下列训练与 WebUI 路径：
+
+#### SDXL 训练修复
+
+- 修正 WebUI **`sdxl-lora`** 路由，对接当前 vendored SDXL 训练脚本栈（#146，自 v2.8.0 起）。
+- 训练子进程启动允许使用 user-site 的 `torch` / `accelerate`，避免整合包环境下误报「训练接口网络请求失败」（#164）。
+- 整合包预置 **`tokenizer-cache/`**（CLIP / T5 等），SDXL / Flux 离线训练不再依赖首次联网拉 tokenizer。
+
+#### 打标修复
+
+- 默认 WD 打标模型 **wd14-convnextv2-v2** 随包预置于 **`tagger-models/wd14/`**，「数据集打标」开箱即用。
+- 打标加载增加 ONNX Runtime 诊断、CUDA 失败 CPU 回退与超时保护，避免无限 loading（v2.8.0）。
+- 经典 / 原生标签编辑器空页渲染与侧栏入口修正（#165 等）。
+
+#### 预览图修复
+
+- 旧 autosave / 导入 TOML 缺少 **`enable_preview`** 时，前后端自动推断并保留 `sample_prompts` 等预览字段（#179、#166）。
+- Anima Fast 开启预览后 **`sample_at_first`** 默认 true，确保至少出一张样图（#160）。
+- Fast 环境安装完成后 **自动刷新页面**，安装进度区不再长期遮挡右侧参数预览（#180）。
+
+#### 训练配置导入修复
+
+- 配置文件 **全量替换导入** 时保留数值类型（整数 / 浮点不再被误转成字符串）（#171）。
+- 导入校验补全 **`anima-lora`** 页规格，并与当前 schema 对齐（#179）。
+- 前端参数预览 / 下载 TOML 序列化修复：union 分支字段回填、`network_args` 安全展开（#179）。
+
+### 整合包说明
+
+- 下载：**[Releases → SD-Trainer-v2.8.2.7z](https://github.com/wochenlong/lora-scripts-next/releases/tag/v2.8.2)**，解压后双击 **`run_gui.bat`**。
+- **Anima Fast** 仍不预装插件 venv；首次在 Fast 页内安装。安装成功后会自动刷新以显示完整参数区。
+- 已装旧版整合包：推荐 **`Update-SD-Trainer-Release.bat`** 合并最新 Release；Git 更新用 **`Update-SD-Trainer.bat`**。
+
+### 发版前验证（已通过）
+
+- 默认 WD 打标、SDXL LoRA 冒烟训练、Anima Fast 安装 + 训练、旧 autosave TOML 导入后参数预览与下载配置。
+
+---
 ## v2.8.1 - 2026-06-25
 
 ### Release blockers

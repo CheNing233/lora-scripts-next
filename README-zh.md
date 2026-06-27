@@ -41,7 +41,7 @@
 ## 三步开始训练
 
 ```
-1. 下载  →  从 [Releases](https://github.com/wochenlong/lora-scripts-next/releases) 下载 **SD-Trainer-v2.7.0.7z**，解压
+1. 下载  →  从 [Releases](https://github.com/wochenlong/lora-scripts-next/releases) 下载 **SD-Trainer-v2.8.2.7z**，解压
 2. 启动  →  双击 run_gui.bat（首次自动安装依赖 ~3 GB）
 3. 训练  →  浏览器打开 http://127.0.0.1:28000，选模型、填参数、开练
 ```
@@ -220,7 +220,7 @@ powershell -ExecutionPolicy Bypass -File .\run_gui_source.ps1
 2. **仓库太旧** — 若脚本里仍是 `torch 2.0.x + cu118`，请 `git pull` 到最新，或改用 [Releases](https://github.com/wochenlong/lora-scripts-next/releases) 整合包。
 3. **半装坏的 venv** — 删掉项目下的 `venv` 文件夹后重装。
 
-**不想折腾环境**：直接下载最新 **SD-Trainer-v2.7.0.7z** 整合包（或 Releases 页当前最新版），解压双击 `run_gui.bat`（内置 Python，无需自装 torch）。
+**不想折腾环境**：直接下载最新 **SD-Trainer-v2.8.2.7z** 整合包（或 Releases 页当前最新版），解压双击 `run_gui.bat`（内置 Python，无需自装 torch）。
 
 重装示例（PowerShell，在项目根目录）：
 
@@ -249,7 +249,7 @@ powershell -ExecutionPolicy Bypass -File .\install-cn.ps1
 <details>
 <summary><b>整合包：能开网页但无法开始训练（旧版 v2.5.2 等）</b></summary>
 
-请升级到 **最新 Release（当前 v2.7.0）**；若你仍在 v2.5.2，可先参考 [`docs/portable-upgrade-2.5.2-to-2.5.3.md`](docs/portable-upgrade-2.5.2-to-2.5.3.md)（[Issue #54](https://github.com/wochenlong/lora-scripts-next/issues/54)），再整包更新到 v2.7.0。
+请升级到 **最新 Release（当前 v2.8.2）**；若你仍在 v2.5.2，可先参考 [`docs/portable-upgrade-2.5.2-to-2.5.3.md`](docs/portable-upgrade-2.5.2-to-2.5.3.md)（[Issue #54](https://github.com/wochenlong/lora-scripts-next/issues/54)），再整包更新到 v2.8.2。
 
 </details>
 
@@ -271,6 +271,7 @@ powershell -ExecutionPolicy Bypass -File .\install-cn.ps1
 
 | 日期 | 版本 |
 |------|------|
+| 2026-06-27 | **v2.8.2** — 整合包：**SDXL 训练**、**打标**、**预览图**、**训练配置导入** 四项修复；内置打标模型与 SDXL tokenizer 缓存 · 见 [CHANGELOG.md](CHANGELOG.md) |
 | 2026-05-28 | **v2.7.0** — **Anima LoRA Fast 模式**（可选 `anima_lora` 插件）：WebUI 入口、页内安装、训练监控同步、性能对标与用户文档 · 见 [`docs/anima-fast.md`](docs/anima-fast.md) |
 | 2026-05-28 | **v2.6.0** — **Anima 全量微调** WebUI（`anima-finetune`）、`anima_train.py` 封装、全量微调导航、监控类型修正；约 24GB 显存参考 |
 | 2026-05-27 | **v2.5.3** — 便携包依赖健康检查、侧栏版本号 ([#54](https://github.com/wochenlong/lora-scripts-next/issues/54)) |
