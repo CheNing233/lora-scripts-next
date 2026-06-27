@@ -38,6 +38,7 @@
 - 下载：**[Releases → SD-Trainer-v2.8.2.7z](https://github.com/wochenlong/lora-scripts-next/releases/tag/v2.8.2)**，解压后双击 **`run_gui.bat`**。
 - **Anima Fast** 仍不预装插件 venv；首次在 Fast 页内安装。安装成功后会自动刷新以显示完整参数区。
 - 已装旧版整合包：推荐 **`Update-SD-Trainer-Release.bat`** 合并最新 Release；Git 更新用 **`Update-SD-Trainer.bat`**。
+- 用户向补充说明（打标目录、命令行训练、升级）：[`docs/portable-getting-started.md`](docs/portable-getting-started.md)
 
 ### 发版前验证（已通过）
 

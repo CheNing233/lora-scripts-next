@@ -46,13 +46,9 @@
 3. Train     →  Open http://127.0.0.1:28000, pick a model, set params, start training
 ```
 
-The portable package ships the default WD tagger **wd14-convnextv2-v2** under **`tagger-models/wd14/`** (~400 MB). If Hugging Face download fails, place `model.onnx` and `selected_tags.csv` there manually — see [`docs/tagger-models.md`](docs/tagger-models.md).
-
-> **CLI / cloud training:** `train.sh` is the legacy SD/SDXL/Flux entry. For Anima use the dedicated scripts:
-> `bash train_anima_by_toml.sh docs/examples/anima-lora-benchmark-kohya.toml` (standard, non-Fast) or
-> `bash train_anima_fast_by_toml.sh docs/examples/anima-lora-benchmark-fast.toml` (Fast plugin; run `bash scripts/cli/install_anima_fast.sh` first).
-
 > **Requirements:** Windows 10/11, NVIDIA GPU (RTX 20+), ~7 GB disk.
+
+For tagger paths, CLI/cloud training, and upgrade notes see **[Portable getting started (details)](docs/portable-getting-started.md)**.
 
 <details>
 <summary><b>Install from source (Linux / advanced users)</b></summary>
@@ -162,6 +158,7 @@ Automatically opens a monitor page (port 6008) when training starts — GPU stat
 
 | Topic | Link |
 |-------|------|
+| **Portable pack details (tagger / CLI / upgrade)** | [docs/portable-getting-started.md](docs/portable-getting-started.md) |
 | Anima LoRA Training Guide | [docs/anima-training.md](docs/anima-training.md) |
 | **Anima Fast Mode (optional plugin)** | [docs/anima-fast.md](docs/anima-fast.md) |
 | Open-source notices | [NOTICE.md](NOTICE.md) |

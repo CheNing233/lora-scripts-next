@@ -46,13 +46,9 @@
 3. 训练  →  浏览器打开 http://127.0.0.1:28000，选模型、填参数、开练
 ```
 
-整合包已内置默认 WD 打标模型 **wd14-convnextv2-v2**（约 400 MB，位于 **`tagger-models/wd14/`**），WebUI「数据集打标」页开箱即用。在线下载失败时，可手动把 `model.onnx` 与 `selected_tags.csv` 放进该目录，详见 [`docs/tagger-models.md`](docs/tagger-models.md)。
-
-> **纯命令行 / 云平台训练：** `train.sh` 是旧式 SD/SDXL/Flux 入口。Anima 请用专用脚本：
-> `bash train_anima_by_toml.sh docs/examples/anima-lora-benchmark-kohya.toml`（标准模式，非 Fast）或
-> `bash train_anima_fast_by_toml.sh docs/examples/anima-lora-benchmark-fast.toml`（Fast 插件；先运行 `bash scripts/cli/install_anima_fast.sh`）。
-
 > **要求：** Windows 10/11，NVIDIA 显卡（RTX 20+），~7 GB 磁盘。
+
+打标模型目录、命令行训练、从旧版升级等补充说明见 **[整合包补充说明](docs/portable-getting-started.md)**。
 
 <details>
 <summary><b>从源码安装（Linux / 高级用户）</b></summary>
@@ -162,6 +158,7 @@ bash install_flash_attn.sh
 
 | 主题 | 链接 |
 |------|------|
+| **整合包补充说明（打标 / CLI / 升级）** | [docs/portable-getting-started.md](docs/portable-getting-started.md) |
 | Anima LoRA 训练指南 | [docs/anima-training.md](docs/anima-training.md) |
 | **Anima Fast 模式（进阶插件）** | [docs/anima-fast.md](docs/anima-fast.md) |
 | 开源归属与 NOTICE | [NOTICE.md](NOTICE.md) |
