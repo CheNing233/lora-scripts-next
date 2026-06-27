@@ -1,1 +1,1 @@
-import{_ as e,o as t,c}from"./app.547295de.js?v=20260627-config-import";const r={};function _(a,o){return t(),c("div")}var n=e(r,[["render",_],["__file","task.html.vue"]]);export{n as default};
+import{_ as e,o as t,c}from"./app.547295de.js?v=20260628-lokr-download";const r={};function _(a,o){return t(),c("div")}var n=e(r,[["render",_],["__file","task.html.vue"]]);export{n as default};
