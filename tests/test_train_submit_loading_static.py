@@ -70,6 +70,27 @@ class TrainSubmitLoadingStaticTests(unittest.TestCase):
         self.assertIn('if(typeof v!=="number"||Number.isNaN(v))continue;', patched)
         self.assertIn("let r=v.toExponential()", patched)
 
+    def test_layout_preview_infers_enable_preview_from_legacy_fields(self):
+        layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('sample_prompts"].some(r=>r in e', layout)
+        self.assertIn("e.enable_preview=!0", layout)
+        self.assertIn("m.enable_preview=!0", layout)
+        self.assertNotIn('"enable_preview","network_args_custom"', layout)
+
+    def test_patch_script_preview_replacements_are_idempotent(self):
+        layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
+            encoding="utf-8"
+        )
+        repatched = layout
+        for label, old, new in patch_config_import_layout.PREVIEW_PATCHES:
+            repatched = patch_config_import_layout._replace_once(
+                repatched, label, old, new
+            )
+        self.assertEqual(layout, repatched)
+
 
 if __name__ == "__main__":
     unittest.main()

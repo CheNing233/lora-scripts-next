@@ -112,6 +112,21 @@ class ConfigImportTests(unittest.TestCase):
         self.assertEqual(result["result"], "reject")
         self.assertTrue(any("sd-scripts" in err for err in result["errors"]))
 
+    def test_legacy_preview_fields_add_enable_preview_on_import(self):
+        config = {
+            "pretrained_model_name_or_path": "./sd-models/anima/anima-base-v1.0.safetensors",
+            "vae": "./sd-models/anima/qwen_image_vae.safetensors",
+            "qwen3": "./sd-models/anima/qwen_3_06b_base.safetensors",
+            "network_module": "networks.lora_anima",
+            "sample_at_first": True,
+            "sample_every_n_epochs": 2,
+            "sample_prompts": "./config/autosave/demo-promopt.txt",
+        }
+        result = validate_config_import("sd3-lora", config)
+        self.assertEqual(result["result"], "ok")
+        self.assertTrue(result["config"]["enable_preview"])
+        self.assertEqual(result["config"]["sample_every_n_epochs"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()
