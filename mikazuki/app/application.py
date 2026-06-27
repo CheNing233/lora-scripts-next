@@ -23,6 +23,13 @@ from mikazuki.utils.devices import check_torch_gpu
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
 
+# Dist bundles patched in-repo keep the same content hash filename; do not
+# treat them as immutable or browsers keep stale JS after git pull / release update.
+_IN_PLACE_PATCHED_DIST_ASSETS = frozenset({
+    "/assets/app.547295de.js",
+    "/assets/layout.96d49288.js",
+})
+
 
 def frontend_dist_path() -> Path:
     frontend_dist = Path(os.environ.get("MIKAZUKI_FRONTEND_DIST", "frontend/dist"))
@@ -156,6 +163,7 @@ async def add_cache_control_header(request, call_next):
     path = request.url.path
     if (
         path.endswith(".html")
+        or path in _IN_PLACE_PATCHED_DIST_ASSETS
         or path.endswith("/assets/tagger-progress.js")
         or path.endswith("/assets/sd-trainer-brand.js")
         or path.endswith("/assets/dataset-editor.js")

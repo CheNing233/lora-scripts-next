@@ -1,7 +1,14 @@
 """Patch vendored layout bundle for cross-page config import validation (#43)."""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from bump_spa_asset_cache_key import bump_dist_cache_keys
 
 LAYOUT = Path("frontend/dist/assets/layout.96d49288.js")
 
@@ -283,6 +290,9 @@ def main() -> None:
 
     LAYOUT.write_text(text, encoding="utf-8")
     print("patched", LAYOUT, "(upgrade)" if already else "(initial)")
+
+    bumped = bump_dist_cache_keys()
+    print(f"bumped SPA cache key in {bumped} dist file(s)")
 
 
 if __name__ == "__main__":
