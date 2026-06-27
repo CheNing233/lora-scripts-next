@@ -3,6 +3,32 @@
 本文件记录 **wochenlong/lora-scripts-next** 面向镜像与 AutoDL 的发行说明；上游 kohya-ss/sd-scripts 的变更请见其仓库。
 
 ---
+## v2.8.3 — 2026-06-28
+
+### 后端与整合包（无前端 layout 变更）
+
+相对 v2.8.2，本版 **仅版本号与后端/便携逻辑** 更新；**未** 重新合入会破坏表单挂载的 LoKr 前端 dist patch（#189 已回滚）。
+
+#### LoKr / 配置导出（#186，API only）
+
+- 新增 **`POST /api/config/normalize-for-export`**，供后续前端或脚本统一导出规范化。
+- 导入时跳过 `undefined` / `null` 等无效 LyCORIS 标量。
+
+#### 整合包：打标与 Hub（#188）
+
+- **`MIKAZUKI_HUB_BACKEND=auto`**；`SmilingWolf/*` 等非魔搭模型直链 Hugging Face。
+- 打标下载终端进度与中文错误提示。
+
+#### 整合包：内置文件选择器（#191）
+
+- 启动/打包时将外层 `sd-models`、`output`、`logs`、`train`、`tagger-models` 联接进 `SD-Trainer/`。
+
+### 说明
+
+- UI 版本芯片显示 **v2.8.3**；SPA 业务 bundle 仍为 **v2.8.2 稳定 dist**（`20260627-config-import`）。
+- LoKr 下载/预览走 API 的前端 patch 待单独 PR 验证后再发。
+
+---
 ## v2.8.2 — 2026-06-27
 
 ### 整合包更新要点
