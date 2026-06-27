@@ -90,6 +90,9 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertIn("dedupeInstallPanels", installer)
         self.assertIn("setControls(last);", installer)
         self.assertIn("already_ready", installer)
+        self.assertIn("maybeReloadAfterInstallReady", installer)
+        self.assertIn("anima-fast-post-install-reload", installer)
+        self.assertIn("安装完成，正在刷新页面以加载参数预览", installer)
         disabled_controls = installer[
             installer.index('q(".right-container button").forEach') : installer.index("document.body.classList.toggle", installer.index('q(".right-container button").forEach'))
         ]
