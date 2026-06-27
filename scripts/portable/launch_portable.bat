@@ -62,6 +62,11 @@ echo [setup] OK >> "%LOG_FILE%"
 cd /d "%PORTABLE_ROOT%SD-Trainer"
 if errorlevel 1 goto :no_project
 
+if exist "scripts\portable\link_portable_data_dirs.py" (
+    echo [portable] Linking sd-models/output/train into SD-Trainer for file picker >> "%LOG_FILE%"
+    "%PYTHON_EXE%" -s scripts\portable\link_portable_data_dirs.py >> "%LOG_FILE%" 2>&1
+)
+
 if exist "scripts\prefetch_default_tagger.py" (
     echo [tagger] Ensuring default WD tagger cache >> "%LOG_FILE%"
     "%PYTHON_EXE%" -s scripts\prefetch_default_tagger.py --if-missing --tagger-models-dir "%MIKAZUKI_TAGGER_MODELS_DIR%" >> "%LOG_FILE%" 2>&1
