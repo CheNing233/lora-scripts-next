@@ -7,10 +7,16 @@ LAYOUT = Path("frontend/dist/assets/layout.96d49288.js")
 
 HELPER_MARKER = "mikazukiApplyImportedConfig=async("
 
+HISTORY_ROW_UNWRAP = (
+    'if(k&&typeof k.value==="object"&&k.time&&!k.model_train_type&&'
+    "(k.value.model_train_type||k.value.pretrained_model_name_or_path))k=k.value;"
+)
+
 HELPER = (
     "mikazukiApplyImportedConfig=async(k,t,schemaFn,a,successMsg,merge,fullReplace)=>{"
     'if(!k||typeof k!=="object")throw new Error("\\u914d\\u7f6e\\u683c\\u5f0f\\u9519\\u8bef\\uff1a\\u9700\\u8981\\u5bf9\\u8c61");'
-    'const resp=await fetch("/api/config/validate-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({page_train_type:t,config:k})});'
+    + HISTORY_ROW_UNWRAP
+    + 'const resp=await fetch("/api/config/validate-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({page_train_type:t,config:k})});'
     'if(!resp.ok)throw new Error("\\u5bfc\\u5165\\u5931\\u8d25\\uff1a\\u7f51\\u7edc\\u9519\\u8bef");'
     "const payload=await resp.json();"
     'if(payload.status!=="success")throw new Error(payload.message||"\\u5bfc\\u5165\\u5931\\u8d25");'
@@ -110,11 +116,6 @@ OLD_HELPER = (
 
 UPGRADE_REPLACEMENTS: list[tuple[str, str, str]] = [
     (
-        "helper body",
-        OLD_HELPER,
-        HELPER,
-    ),
-    (
         "config import clones validation input",
         "let U=findChangedDataBySchema(cfg,schemaFn);",
         "let U=findChangedDataBySchema(clone(cfg),schemaFn);",
@@ -170,6 +171,38 @@ UPGRADE_REPLACEMENTS: list[tuple[str, str, str]] = [
         "import notice toast",
         "if(successMsg)ElMessage.success(successMsg);return!0}",
         'if(data.notice)ElMessage.info({message:data.notice,duration:8e3});if(successMsg)ElMessage.success(successMsg);else if(data.message&&data.result==="ok")ElMessage.success(data.message);return!0}',
+    ),
+    (
+        "history row unwrap",
+        'if(!k||typeof k!=="object")throw new Error("\\u914d\\u7f6e\\u683c\\u5f0f\\u9519\\u8bef\\uff1a\\u9700\\u8981\\u5bf9\\u8c61");const resp=await fetch("/api/config/validate-import"',
+        'if(!k||typeof k!=="object")throw new Error("\\u914d\\u7f6e\\u683c\\u5f0f\\u9519\\u8bef\\uff1a\\u9700\\u8981\\u5bf9\\u8c61");'
+        + HISTORY_ROW_UNWRAP
+        + 'const resp=await fetch("/api/config/validate-import"',
+    ),
+    (
+        "history preview uses main preview pipeline",
+        'Z=(_,m)=>{const g=stringify(parseParams(n.value(clone(m.value)),t));ElMessageBox.alert(g,"\\u9884\\u89C8",{confirmButtonText:"\\u786E\\u5B9A",customStyle:{whiteSpace:"pre-line"}})}',
+        (
+            'Z=async (_,m)=>{try{const cfg=m==null?null:m.value;if(!cfg||typeof cfg!="object"){ElMessage.error("\\u5386\\u53f2\\u8bb0\\u5f55\\u7f3a\\u5c11\\u6709\\u6548\\u914d\\u7f6e");return}'
+            "const prev=clone(a.value);a.value=clone(cfg);const g=x();a.value=prev;"
+            'ElMessageBox.alert(g,"\\u9884\\u89C8",{confirmButtonText:"\\u786E\\u5B9A",customStyle:{whiteSpace:"pre-line"}})'
+            '}catch(e){console.log(e);ElMessage.error(e.message||"\\u9884\\u89c8\\u5931\\u8d25")}}'
+        ),
+    ),
+    (
+        "parseParams safe optimizer_type dada",
+        'e.optimizer_type.toLowerCase().startsWith("dada")',
+        '(e.optimizer_type||"").toLowerCase().startsWith("dada")',
+    ),
+    (
+        "parseParams safe optimizer_type prodigy",
+        'e.optimizer_type.toLowerCase()=="prodigy"',
+        '(e.optimizer_type||"").toLowerCase()=="prodigy"',
+    ),
+    (
+        "parseParams safe gpu_ids",
+        "return e.gpu_ids&&(e.gpu_ids=e.gpu_ids.map(r=>r.match(/GPU (\\d+):/)[1])),e",
+        'return e.gpu_ids&&(e.gpu_ids=e.gpu_ids.map(r=>{if(r==null)return"";if(typeof r==="number"||/^\\d+$/.test(String(r)))return String(r);const m=String(r).match(/GPU (\\d+):/);return m?m[1]:String(r)}).filter(Boolean)),e',
     ),
 ]
 

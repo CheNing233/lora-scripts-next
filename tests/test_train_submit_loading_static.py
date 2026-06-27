@@ -91,6 +91,16 @@ class TrainSubmitLoadingStaticTests(unittest.TestCase):
             )
         self.assertEqual(layout, repatched)
 
+    def test_layout_history_row_unwrap_and_preview_pipeline(self):
+        layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("k.time&&!k.model_train_type", layout)
+        self.assertIn("Z=async (_,m)=>{try{const cfg=m==null?null:m.value;", layout)
+        self.assertIn("const prev=clone(a.value);a.value=clone(cfg);const g=x();", layout)
+        self.assertIn('(e.optimizer_type||"").toLowerCase().startsWith("dada")', layout)
+        self.assertIn("filter(Boolean)),e", layout)
+
 
 if __name__ == "__main__":
     unittest.main()
