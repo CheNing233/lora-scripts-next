@@ -45,6 +45,16 @@ class TestSpaAssetCache(unittest.TestCase):
             app_js,
         )
 
+    def test_layout_skips_undefined_lycoris_rebuild(self):
+        layout = (ROOT / "frontend/dist/assets/layout.96d49288.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('String(v)!=="undefined"', layout)
+        self.assertNotIn(
+            '"conv_dim="+e.conv_dim,"conv_alpha="+e.conv_alpha,"dropout="+e.dropout,"algo="+e.lycoris_algo]',
+            layout,
+        )
+
     def test_in_place_patched_assets_not_immutable(self):
         source = (ROOT / "mikazuki/app/application.py").read_text(encoding="utf-8")
         self.assertIn("/assets/layout.96d49288.js", source)
