@@ -127,6 +127,40 @@ class ConfigImportTests(unittest.TestCase):
         self.assertTrue(result["config"]["enable_preview"])
         self.assertEqual(result["config"]["sample_every_n_epochs"], 2)
 
+    def test_history_row_wrapper_unwraps_before_import(self):
+        inner = {
+            "model_train_type": "anima-lora",
+            "pretrained_model_name_or_path": "./sd-models/anima/anima-base-v1.0.safetensors",
+            "positive_prompts": "1girl",
+            "sample_at_first": True,
+        }
+        wrapper = {"time": "2026-06-27", "name": "demo", "value": inner}
+        result = validate_config_import("sd3-lora", wrapper)
+        self.assertEqual(result["result"], "ok")
+        self.assertEqual(result["config"]["model_train_type"], "anima-lora")
+        self.assertNotIn("time", result["config"])
+        self.assertNotIn("value", result["config"])
+        self.assertTrue(result["config"]["enable_preview"])
+
+    def test_cannot_import_toml_lokr_preview_signals(self):
+        from pathlib import Path
+
+        import toml
+
+        cfg = toml.loads(
+            Path("tmp/cannot-import.toml").read_text(encoding="utf-8")
+        )
+        result = validate_config_import("sd3-lora", cfg)
+        self.assertEqual(result["result"], "ok")
+        self.assertTrue(result["config"]["enable_preview"])
+        self.assertEqual(result["config"]["lora_type"], "lokr")
+        self.assertEqual(result["config"]["conv_dim"], 16)
+        self.assertEqual(result["config"]["conv_alpha"], 1)
+        self.assertEqual(result["config"]["dropout"], 0)
+        self.assertEqual(result["config"]["lycoris_algo"], "lokr")
+        self.assertEqual(result["config"]["lokr_factor"], -1)
+        self.assertNotIn("weight_deca", result["config"].get("optimizer_args", []))
+
 
 if __name__ == "__main__":
     unittest.main()

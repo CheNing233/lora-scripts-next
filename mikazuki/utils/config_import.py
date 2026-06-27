@@ -343,9 +343,144 @@ def _resolve_page_spec(page_train_type: str) -> dict[str, Any] | None:
     return PAGE_SPECS.get(normalized) or PAGE_SPECS.get(page_train_type)
 
 
+def _unwrap_history_row_config(config: dict) -> dict:
+    """Unwrap browser history rows `{time, name?, value}` accidentally imported as config."""
+    if not isinstance(config, dict):
+        return config
+    inner = config.get("value")
+    if not isinstance(inner, dict) or "time" not in config:
+        return config
+    if config.get("model_train_type") is not None:
+        return config
+    if inner.get("model_train_type") or inner.get("pretrained_model_name_or_path"):
+        return copy.deepcopy(inner)
+    return config
+
+
+_LYCORIS_NETWORK_ARG_TO_UI: dict[str, str] = {
+    "algo": "lycoris_algo",
+    "factor": "lokr_factor",
+    "conv_dim": "conv_dim",
+    "conv_alpha": "conv_alpha",
+    "dropout": "dropout",
+    "use_cp": "use_cp",
+    "use_scalar": "use_scalar",
+    "decompose_both": "decompose_both",
+    "bypass_mode": "bypass_mode",
+    "dora_wd": "dora_wd",
+    "full_matrix": "full_matrix",
+    "rank_dropout": "rank_dropout",
+    "module_dropout": "module_dropout",
+    "rank_dropout_scale": "rank_dropout_scale",
+    "train_norm": "train_norm",
+}
+
+_LYCORIS_BOOL_UI_FIELDS = frozenset({
+    "use_cp",
+    "use_scalar",
+    "decompose_both",
+    "bypass_mode",
+    "dora_wd",
+    "full_matrix",
+    "rank_dropout_scale",
+    "train_norm",
+})
+
+_LYCORIS_ALGO_TO_LORA_TYPE = {
+    "lokr": "lokr",
+    "loha": "loha",
+    "locon": "locon",
+    "ia3": "ia3",
+    "dylora": "dylora",
+    "glora": "glora",
+    "diag-oft": "diag-oft",
+    "boft": "boft",
+}
+
+
+def _parse_network_arg_item(item: Any) -> tuple[str, str] | None:
+    if not isinstance(item, str) or "=" not in item:
+        return None
+    key, value = item.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    if not key:
+        return None
+    return key, value
+
+
+def _coerce_import_scalar(value: str, *, as_bool: bool = False) -> Any:
+    if as_bool:
+        lowered = value.lower()
+        if lowered in {"true", "1", "yes", "on"}:
+            return True
+        if lowered in {"false", "0", "no", "off"}:
+            return False
+        return value
+    if re.fullmatch(r"-?\d+", value):
+        return int(value)
+    try:
+        number = float(value)
+    except ValueError:
+        return value
+    return int(number) if number.is_integer() else number
+
+
+def _hydrate_lycoris_ui_fields_from_network_args(config: dict) -> None:
+    """Map legacy/imported network_args lines back to LyCORIS UI fields for preview."""
+    if str(config.get("network_module", "")).strip().lower() != "lycoris.kohya":
+        return
+    raw_args = config.get("network_args")
+    if not isinstance(raw_args, list):
+        return
+
+    parsed: dict[str, str] = {}
+    for item in raw_args:
+        parsed_item = _parse_network_arg_item(item)
+        if parsed_item is None:
+            continue
+        key, value = parsed_item
+        parsed[key.lower()] = value
+
+    for arg_key, ui_field in _LYCORIS_NETWORK_ARG_TO_UI.items():
+        if ui_field in config and config[ui_field] not in (None, ""):
+            continue
+        raw_value = parsed.get(arg_key)
+        if raw_value is None:
+            continue
+        config[ui_field] = _coerce_import_scalar(
+            raw_value,
+            as_bool=ui_field in _LYCORIS_BOOL_UI_FIELDS,
+        )
+
+    algo = str(parsed.get("algo") or config.get("lycoris_algo") or "").strip().lower()
+    if algo and not config.get("lora_type"):
+        config["lora_type"] = _LYCORIS_ALGO_TO_LORA_TYPE.get(algo, algo)
+
+
+def _sanitize_arg_lines(config: dict, key: str) -> None:
+    raw = config.get(key)
+    if not isinstance(raw, list):
+        return
+    cleaned: list[str] = []
+    for item in raw:
+        parsed = _parse_network_arg_item(item)
+        if parsed is None:
+            continue
+        arg_key, value = parsed
+        cleaned.append(f"{arg_key}={value}")
+    if cleaned:
+        config[key] = cleaned
+    else:
+        config.pop(key, None)
+
+
 def _finalize_import_config(config: dict) -> dict:
     """Apply cross-page normalizers for imported GUI configs."""
     normalized = copy.deepcopy(config)
+    _sanitize_arg_lines(normalized, "network_args")
+    _sanitize_arg_lines(normalized, "optimizer_args")
+    _hydrate_lycoris_ui_fields_from_network_args(normalized)
     ensure_enable_preview_flag(normalized)
     return normalized
 
@@ -457,6 +592,8 @@ def validate_config_import(page_train_type: str, config: dict) -> dict[str, Any]
             "result": "reject",
             "errors": ["配置必须是 JSON 对象 / TOML 表"],
         }
+
+    config = _unwrap_history_row_config(config)
 
     if _looks_like_sd_scripts_toml(config):
         return {
