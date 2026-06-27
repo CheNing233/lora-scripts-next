@@ -76,6 +76,11 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertNotIn("data-anima-fast-guide-toggle", page_text)
         self.assertNotIn("anima-fast-doc-links", page_text)
         guide = Path("frontend/dist/help/guide.html").read_text(encoding="utf-8")
+        self.assertIn("guide.html.b8e2d701.js", guide)
+        self.assertIn("guide.html.c3f4a902.js", guide)
+        self.assertNotIn("guide.html.a1b2c3d4.js", guide)
+        self.assertNotIn("guide.html.e5f6a7b8.js", guide)
+        self.assertNotIn(".js.js", guide)
         self.assertIn("sd-guide-pager", guide)
         self.assertIn("data-guide-pager", guide)
         self.assertIn("sd-guide-anima-fast", guide)
@@ -112,6 +117,8 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertNotIn("\n  <ul>", source)
         self.assertIn('aria-hidden":"true",style:"display:none"', source)
         self.assertEqual(source.count("`") % 2, 0)
+        self.assertIn('from"./app.547295de.js?v=20260605-routefix2"', source)
+        self.assertNotIn('from"app.547295de.js?v=', source)
         subprocess.run(["node", "--check", str(guide_js)], check=True)
 
     def test_fast_install_log_uses_compact_height(self):
