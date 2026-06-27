@@ -101,6 +101,40 @@ class TrainSubmitLoadingStaticTests(unittest.TestCase):
         self.assertIn('(e.optimizer_type||"").toLowerCase().startsWith("dada")', layout)
         self.assertIn("filter(Boolean)),e", layout)
 
+    def test_anima_download_uses_backend_export_api(self):
+        layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("mikazukiUsesBackendExport=pt=>", layout)
+        self.assertIn("/api/config/normalize-for-export", layout)
+        self.assertIn("E=async()=>{try{if(mikazukiUsesBackendExport(t))", layout)
+        self.assertIn("backendPreview=ref(", layout)
+        self.assertIn("backendPreview.value||x()", layout)
+        self.assertIn("watch([()=>a.value,()=>n.value],scheduleBackendPreview", layout)
+        self.assertIn("L=computed(()=>{try{return backendPreview.value||x()}catch(_){console.log(_)}})", layout)
+
+    def test_patch_script_download_replacements_are_idempotent(self):
+        layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
+            encoding="utf-8"
+        )
+        repatched = layout
+        for label, old, new in patch_config_import_layout.DOWNLOAD_PATCHES:
+            repatched = patch_config_import_layout._replace_once(
+                repatched, label, old, new
+            )
+        self.assertEqual(layout, repatched)
+
+    def test_patch_script_preview_overlay_replacements_are_idempotent(self):
+        layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
+            encoding="utf-8"
+        )
+        repatched = layout
+        for label, old, new in patch_config_import_layout.PREVIEW_OVERLAY_PATCHES:
+            repatched = patch_config_import_layout._replace_once(
+                repatched, label, old, new
+            )
+        self.assertEqual(layout, repatched)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,7 +3,11 @@
 from fastapi.testclient import TestClient
 
 from mikazuki.app.application import app
-from mikazuki.tagger.model_fetch import use_download_endpoint
+from mikazuki.tagger.model_fetch import (
+    describe_interrogator_asset_status,
+    format_tagger_download_error,
+    use_download_endpoint,
+)
 from mikazuki.tagger.progress import tagger_progress
 from mikazuki.tagger.interrogators.wd14 import WaifuDiffusionInterrogator
 from mikazuki.tagger.local_models import (
@@ -98,3 +102,36 @@ def test_tagger_assets_keep_legacy_flat_local_model_dir_compatible(tmp_path, mon
         model_dir / "model.onnx",
         model_dir / "selected_tags.csv",
     )
+
+
+def test_describe_interrogator_asset_status_reports_local_dir(tmp_path, monkeypatch):
+    monkeypatch.setenv("MIKAZUKI_TAGGER_MODELS_DIR", str(tmp_path / "tagger-models"))
+    interrogator = WaifuDiffusionInterrogator(
+        "wd-vit-large-tagger-v3",
+        repo_id="SmilingWolf/wd-vit-large-tagger-v3",
+    )
+    ready, msg = describe_interrogator_asset_status("wd-vit-large-tagger-v3", interrogator)
+    assert ready is False
+    assert "未在本地" in msg
+    assert "tagger-models" in msg
+    assert "SmilingWolf/wd-vit-large-tagger-v3" in msg
+
+
+def test_format_tagger_download_error_network_hint():
+    from huggingface_hub.errors import LocalEntryNotFoundError
+
+    hint = format_tagger_download_error(
+        "wd-vit-large-tagger-v3",
+        LocalEntryNotFoundError("Cannot find file"),
+    )
+    assert "huggingface.co" in hint
+    assert "未在本地" in hint
+
+
+def test_format_tagger_download_error_modelscope_404():
+    hint = format_tagger_download_error(
+        "wd-vit-large-tagger-v3",
+        Exception("Repo SmilingWolf/wd-vit-large-tagger-v3 not exists on modelscope.cn"),
+    )
+    assert "魔搭" in hint
+    assert "SmilingWolf" in hint

@@ -3,6 +3,28 @@
 本文件记录 **wochenlong/lora-scripts-next** 面向镜像与 AutoDL 的发行说明；上游 kohya-ss/sd-scripts 的变更请见其仓库。
 
 ---
+## v2.8.3 — 2026-06-28
+
+### LoKr / 配置导出导入（#186）
+
+- 新增 **`POST /api/config/normalize-for-export`**：预览、下载 TOML、开训共用同一套导出规范化逻辑。
+- LoKr 空 `conv_dim` 不再序列化为 `undefined`；下载 TOML 可二次导入。
+- 前端 dist：`parseParams` LyCORIS guard、仅下载走 API、预览 overlay 与 `backendPreview` 对齐。
+
+### 整合包：打标与 Hub
+
+- **`MIKAZUKI_HUB_BACKEND=auto`**（不再强制魔搭）；`SmilingWolf/*`、`cella110n/*` 绕过魔搭直链 Hugging Face。
+- 打标下载终端可见进度与中文错误分类；`launch_portable.bat` 保留 GUI stderr 到控制台。
+
+### 整合包：内置文件选择器
+
+- 启动/打包时 **`link_portable_data_dirs.py`** 将外层 `sd-models`、`output`、`logs`、`train`、`tagger-models` 联接进 `SD-Trainer/`，内置 picker 可选整合包根目录数据。
+
+### 其它
+
+- `config_args` / `config_export` 模块抽取；SPA cache key 更新。
+
+---
 ## v2.8.2 — 2026-06-27
 
 ### 整合包更新要点
