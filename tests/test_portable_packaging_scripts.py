@@ -33,15 +33,19 @@ def test_portable_builder_initializes_dataset_tag_editor_before_copy():
     assert "dataset-tag-editor\\scripts\\launch.py" in script
 
 
-def test_portable_launcher_keeps_default_hf_mirror_for_skip_prepare_mode():
+def test_portable_launcher_uses_auto_hub_backend_without_forcing_modelscope():
     launcher = (ROOT / "scripts" / "portable" / "launch_portable.bat").read_text(
         encoding="utf-8"
     )
 
-    assert "HF_ENDPOINT" in launcher
-    assert "https://hf-mirror.com" in launcher
+    assert "MIKAZUKI_HUB_BACKEND=auto" in launcher
+    assert "MIKAZUKI_HUB_BACKEND=modelscope" not in launcher
     assert "MIKAZUKI_TOKENIZER_CACHE_DIR" in launcher
     assert "prefetch_sdxl_tokenizer.py" in launcher
+    assert "-u gui.py" in launcher
+    assert 'gui.py --skip-prepare-environment' in launcher
+    gui_line = next(line for line in launcher.splitlines() if "gui.py" in line and "PYTHON_EXE" in line)
+    assert "2>>" not in gui_line
 
 
 def test_portable_builder_bundles_sdxl_tokenizer_cache():
