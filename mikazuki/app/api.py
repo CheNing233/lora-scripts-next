@@ -37,6 +37,7 @@ from mikazuki.anima_fast_backend import TRAIN_TYPE as ANIMA_FAST_TRAIN_TYPE
 from mikazuki.anima_fast_backend.adapter import (
     AdapterError,
     adapt_config,
+    dump_fast_dataset_toml,
     dump_flat_toml,
     ensure_fast_run_log_dirs,
 )
@@ -578,7 +579,10 @@ def _write_anima_fast_toml(config: dict, timestamp: str, autosave_dir: str) -> t
 
 def _write_adapted_anima_fast_toml(values: dict, warnings: list[str], run_id: str, autosave_dir: str) -> tuple[Path, dict, list[str]]:
     toml_file = Path(autosave_dir) / f"{run_id}.toml"
+    dataset_file = Path(autosave_dir) / f"{run_id}-dataset.toml"
     ensure_fast_run_log_dirs(values)
+    values["dataset_config"] = dataset_file.resolve().as_posix()
+    dataset_file.write_text(dump_fast_dataset_toml(values), encoding="utf-8")
     toml_file.write_text(dump_flat_toml(values), encoding="utf-8")
     return toml_file, values, warnings
 

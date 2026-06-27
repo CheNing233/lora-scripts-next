@@ -88,6 +88,8 @@ FAST_CACHE_PAIRS = (
     ("cache_text_encoder_outputs", "cache_text_encoder_outputs_to_disk"),
 )
 
+FAST_DATASET_REPEAT_FIELDS = {"dataset_repeats", "num_repeats", "repeats", "repeat"}
+
 
 @dataclass
 class AdaptedConfig:
@@ -132,6 +134,21 @@ def resolution_tokens(value: Any) -> int:
     if width <= 0 or height <= 0:
         return 0
     return (width // 16) * (height // 16)
+
+
+def resolution_pair(value: Any, default: int = 1024) -> list[int]:
+    if value is None:
+        return [default, default]
+    if isinstance(value, int):
+        return [value, value]
+    text = str(value).replace("x", ",").replace(" ", "")
+    parts = [p for p in text.split(",") if p]
+    if len(parts) == 1:
+        size = int_value(parts[0], default)
+        return [size, size]
+    if len(parts) >= 2:
+        return [int_value(parts[0], default), int_value(parts[1], default)]
+    return [default, default]
 
 
 def normalize_kv_args(values: Any) -> list[str]:
@@ -307,6 +324,16 @@ def adapt_config(source: dict[str, Any], runtime: RuntimeConfig, run_id: str) ->
             continue
         values[key] = value
 
+    train_batch_size = int_value(values.get("train_batch_size"), 0)
+    if train_batch_size > 0:
+        values["batch_size"] = train_batch_size
+
+    for repeat_key in FAST_DATASET_REPEAT_FIELDS:
+        repeats = int_value(source.get(repeat_key), 0)
+        if repeats > 0:
+            values["dataset_repeats"] = repeats
+            break
+
     values.setdefault("torch_compile", True)
     values.setdefault("static_token_count", 4096)
     if truthy(values.get("torch_compile")):
@@ -384,6 +411,42 @@ def toml_scalar(value: Any) -> str:
 
 def dump_flat_toml(values: dict[str, Any]) -> str:
     return "".join(f"{key} = {toml_scalar(value)}\n" for key, value in values.items())
+
+
+def dump_fast_dataset_toml(values: dict[str, Any]) -> str:
+    batch_size = int_value(values.get("batch_size") or values.get("train_batch_size"), 1) or 1
+    repeats = int_value(values.get("dataset_repeats") or values.get("num_repeats"), 1) or 1
+    dataset_values = {
+        "resolution": resolution_pair(values.get("resolution", "1024,1024")),
+        "batch_size": batch_size,
+        "enable_bucket": values.get("enable_bucket", True),
+        "validation_split_num": int_value(values.get("validation_split_num"), 16),
+        "validation_seed": int_value(values.get("validation_seed"), 42),
+    }
+    for key in ("min_bucket_reso", "max_bucket_reso", "bucket_reso_steps", "bucket_no_upscale", "validation_split"):
+        if not is_empty(values.get(key)):
+            dataset_values[key] = values[key]
+
+    subset_values = {
+        "image_dir": values.get("resized_image_dir"),
+        "cache_dir": values.get("lora_cache_dir"),
+        "num_repeats": repeats,
+        "recursive": values.get("recursive", True),
+    }
+    if not is_empty(values.get("path_pattern")):
+        subset_values["path_pattern"] = values["path_pattern"]
+
+    lines = ["[general]\n"]
+    lines.append(f"caption_extension = {toml_scalar(values.get('caption_extension', '.txt'))}\n")
+    if not is_empty(values.get("keep_tokens")):
+        lines.append(f"keep_tokens = {toml_scalar(values['keep_tokens'])}\n")
+    else:
+        lines.append("keep_tokens = 3\n")
+    lines.append("\n[[datasets]]\n")
+    lines.extend(f"{key} = {toml_scalar(value)}\n" for key, value in dataset_values.items())
+    lines.append("\n  [[datasets.subsets]]\n")
+    lines.extend(f"  {key} = {toml_scalar(value)}\n" for key, value in subset_values.items() if not is_empty(value))
+    return "".join(lines)
 
 
 def ensure_fast_run_log_dirs(values: dict[str, Any], now: datetime | None = None) -> list[Path]:
