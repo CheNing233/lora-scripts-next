@@ -46,6 +46,7 @@ Schema.intersect([
         max_train_epochs: Schema.number().min(1).default(1).description("最大训练 epoch；设置后 Anima 会按 epoch 和 dataloader 长度重算 step"),
         max_train_steps: Schema.number().min(1).description("最大训练 step；仅在 max_train_epochs 为空时按 step 控制"),
         train_batch_size: Schema.number().min(1).default(1).description("批量大小"),
+        dataset_repeats: Schema.number().min(1).default(1).description("数据集重复次数"),
         gradient_checkpointing: Schema.boolean().default(true).description("梯度检查点（省显存）。开启时请勿选 compile_mode=full"),
         gradient_accumulation_steps: Schema.number().min(1).default(1).description("梯度累加步数"),
         seed: Schema.number().step(1).default(42).description("随机种子"),

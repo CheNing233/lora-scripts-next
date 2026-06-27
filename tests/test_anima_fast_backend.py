@@ -11,6 +11,7 @@ from mikazuki.anima_fast_backend.adapter import (
     adapt_config,
     dataset_cache_slug,
     dump_flat_toml,
+    dump_fast_dataset_toml,
     ensure_fast_run_log_dirs,
 )
 from mikazuki.anima_fast_backend.extension_state import (
@@ -216,6 +217,43 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(resized, (root / ".cache" / "anima_fast" / "data_train_data" / "resized").resolve())
         self.assertEqual(lora_cache, (root / ".cache" / "anima_fast" / "data_train_data" / "lora").resolve())
         self.assertNotIn("20260101-run", resized.as_posix())
+
+    def test_adapt_config_maps_fast_dataset_batch_size_and_repeats(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            runtime = make_runtime(root)
+            adapted = adapt_config(
+                {
+                    "lora_type": "lora",
+                    "train_batch_size": 4,
+                    "dataset_repeats": 7,
+                },
+                runtime,
+                "run-1",
+            )
+
+        self.assertEqual(adapted.values["train_batch_size"], 4)
+        self.assertEqual(adapted.values["batch_size"], 4)
+        self.assertEqual(adapted.values["dataset_repeats"], 7)
+
+    def test_dump_fast_dataset_toml_writes_dataset_overrides(self):
+        text = dump_fast_dataset_toml(
+            {
+                "resized_image_dir": "D:/data/resized",
+                "lora_cache_dir": "D:/data/lora",
+                "caption_extension": ".txt",
+                "resolution": "1024,1024",
+                "enable_bucket": True,
+                "train_batch_size": 4,
+                "dataset_repeats": 7,
+            }
+        )
+
+        self.assertIn("[[datasets]]", text)
+        self.assertIn("resolution = [1024, 1024]", text)
+        self.assertIn("batch_size = 4", text)
+        self.assertIn("[[datasets.subsets]]", text)
+        self.assertIn("num_repeats = 7", text)
 
     def test_dataset_cache_slug_from_relative_path(self):
         with tempfile.TemporaryDirectory() as td:
