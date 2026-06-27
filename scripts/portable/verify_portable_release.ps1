@@ -1,4 +1,4 @@
-# Full pre-release checklist for SD-Trainer portable package (build/整合包打包规范 §7).
+﻿# Full pre-release checklist for SD-Trainer portable package (build/整合包打包规范 §7).
 param(
     [Parameter(Mandatory = $true)]
     [string]$PortableRoot,
@@ -75,6 +75,24 @@ $requiredRoot = @(
 foreach ($rel in $requiredRoot) {
     $full = Join-Path $PortableRoot $rel
     if (Test-Path $full) { Pass $rel } else { Fail "Missing: $rel" }
+}
+
+$batCrlfChecks = @(
+    "Update-SD-Trainer-Release.bat",
+    "Update-SD-Trainer.bat",
+    "run_gui.bat",
+    "SD-Trainer\scripts\portable\launch_portable.bat"
+)
+foreach ($rel in $batCrlfChecks) {
+    $full = Join-Path $PortableRoot $rel
+    if (-not (Test-Path $full)) { continue }
+    $bytes = [System.IO.File]::ReadAllBytes($full)
+    $lfOnly = ($bytes -contains 10) -and -not ($bytes -contains 13)
+    if ($lfOnly) {
+        Fail "$rel uses LF-only line endings (cmd.exe may fail to parse)"
+    } else {
+        Pass "$rel CRLF line endings"
+    }
 }
 
 $gitHead = Join-Path $TrainerDir ".git\HEAD"

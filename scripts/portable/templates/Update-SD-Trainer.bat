@@ -3,6 +3,7 @@ chcp 65001 >nul 2>&1
 setlocal EnableDelayedExpansion
 title Update SD-Trainer
 set "PORTABLE_ROOT=%~dp0"
+for %%I in ("%~dp0.") do set "PORTABLE_ROOT_PS=%%~fI"
 set "PROJECT_DIR=%PORTABLE_ROOT%SD-Trainer"
 
 if /I not "%~1"=="--no-bootstrap" (
@@ -40,7 +41,7 @@ if exist "%PROJECT_DIR%\VERSION" set /p VER_BEFORE=<"%PROJECT_DIR%\VERSION"
 if exist "%PROJECT_DIR%\PORTABLE_BUILD" set /p BUILD_BEFORE=<"%PROJECT_DIR%\PORTABLE_BUILD"
 set "STATUS_PS1=%PROJECT_DIR%\scripts\portable\show_portable_update_status.ps1"
 if exist "%STATUS_PS1%" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%STATUS_PS1%" -PortableRoot "%PORTABLE_ROOT%" -UpdaterLabel "Git" -UpdaterFile "%~f0"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%STATUS_PS1%" -PortableRoot "%PORTABLE_ROOT_PS%" -UpdaterLabel "Git" -UpdaterFile "%~f0"
 ) else (
     call :print_version_info
 )
@@ -338,7 +339,7 @@ if errorlevel 1 exit /b 0
 where curl >nul 2>&1
 if errorlevel 1 exit /b 0
 if not exist "%PROJECT_DIR%\scripts\portable\bootstrap_portable_updaters.ps1" exit /b 0
-powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%\scripts\portable\bootstrap_portable_updaters.ps1" -PortableRoot "%PORTABLE_ROOT%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%\scripts\portable\bootstrap_portable_updaters.ps1" -PortableRoot "%PORTABLE_ROOT_PS%"
 exit /b %errorlevel%
 
 :: =============== Subroutine: print_version_info ===============

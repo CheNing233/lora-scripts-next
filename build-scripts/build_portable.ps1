@@ -36,6 +36,33 @@ if ($Clean -and (Test-Path $portableDir)) {
 }
 New-Item -ItemType Directory -Path $portableDir -Force | Out-Null
 
+function Copy-PortableBatchFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+    if (-not (Test-Path $Source)) {
+        throw "Batch source not found: $Source"
+    }
+    $dir = Split-Path $Destination -Parent
+    if ($dir -and -not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    $text = [System.IO.File]::ReadAllText($Source)
+    $text = $text -replace "`r`n", "`n" -replace "`r", "`n" -replace "`n", "`r`n"
+    if ($text.Length -gt 0 -and [int][char]$text[0] -eq 0xFEFF) {
+        $text = $text.Substring(1)
+    }
+    [System.IO.File]::WriteAllText($Destination, $text, (New-Object System.Text.UTF8Encoding $false))
+}
+
+function Normalize-PortableBatchFilesInTree {
+    param([Parameter(Mandatory = $true)][string]$Root)
+    Get-ChildItem -Path $Root -Filter "*.bat" -Recurse -File | ForEach-Object {
+        Copy-PortableBatchFile -Source $_.FullName -Destination $_.FullName
+    }
+}
+
 function Invoke-GitChecked {
     param(
         [string[]]$Arguments,
@@ -546,7 +573,7 @@ Write-Host "[4/6] Creating launcher scripts..." -ForegroundColor Cyan
 # run_gui_portable.bat — root shim (logic lives in SD-Trainer/scripts/portable/, updates with project)
 $shimSrc = Join-Path $ProjectRoot "scripts\portable\run_gui_portable_shim.bat"
 if (Test-Path $shimSrc) {
-    Copy-Item $shimSrc -Destination (Join-Path $portableDir "run_gui_portable.bat") -Force
+    Copy-PortableBatchFile $shimSrc (Join-Path $portableDir "run_gui_portable.bat")
     Write-Host "  Created run_gui_portable.bat (shim -> scripts/portable/launch_portable.bat)"
 } else {
     Write-Host "  WARNING: scripts/portable/run_gui_portable_shim.bat not found" -ForegroundColor Yellow
@@ -556,7 +583,7 @@ if (Test-Path $shimSrc) {
 # python_embeded and dispatches to run_gui_portable.bat).
 $repoRunGui = Join-Path $ProjectRoot "run_gui.bat"
 if (Test-Path $repoRunGui) {
-    Copy-Item $repoRunGui -Destination (Join-Path $portableDir "run_gui.bat") -Force
+    Copy-PortableBatchFile $repoRunGui (Join-Path $portableDir "run_gui.bat")
     Write-Host "  Copied run_gui.bat (unified launcher from repo)"
 } else {
     Write-Host "  WARNING: run_gui.bat not found in repo root" -ForegroundColor Yellow
@@ -619,17 +646,20 @@ Write-Host "  Created install_xformers.bat"
 $templateDir = Join-Path $PSScriptRoot "templates"
 $portableTemplateDir = Join-Path $sdtDir "scripts\portable\templates"
 New-Item -ItemType Directory -Path $portableTemplateDir -Force | Out-Null
-foreach ($bat in @("Update-SD-Trainer.bat", "Update-SD-Trainer-Release.bat", "Download-Anima-Model.bat")) {
+foreach ($bat in @("Update-SD-Trainer.bat", "Update-SD-Trainer-Release.bat", "Download-Anima-Model.bat", "Fix-Portable-Bats.bat")) {
     $src = Join-Path $templateDir $bat
     if (-not (Test-Path $src)) {
         $src = Join-Path $ProjectRoot $bat
     }
     if (Test-Path $src) {
-        Copy-Item $src -Destination (Join-Path $portableDir $bat)
-        Copy-Item $src -Destination (Join-Path $portableTemplateDir $bat)
+        Copy-PortableBatchFile $src (Join-Path $portableDir $bat)
+        Copy-PortableBatchFile $src (Join-Path $portableTemplateDir $bat)
         Write-Host "  Created $bat"
     }
 }
+
+Write-Host "  Normalizing .bat line endings (CRLF) for Windows cmd..."
+Normalize-PortableBatchFilesInTree -Root $portableDir
 
 # ==== Step 5: Empty dirs + README ====
 

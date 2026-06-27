@@ -1,4 +1,4 @@
-# Pre-release checks for portable update scripts (git + release).
+﻿# Pre-release checks for portable update scripts (git + release).
 param(
     [Parameter(Mandatory = $true)]
     [string]$PortableRoot,

@@ -1,4 +1,4 @@
-# Sync portable SD-Trainer from the latest GitHub Release 7z (keeps user data).
+﻿# Sync portable SD-Trainer from the latest GitHub Release 7z (keeps user data).
 param(
     [Parameter(Mandatory = $true)]
     [string]$PortableRoot,
@@ -8,9 +8,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 . (Join-Path $PSScriptRoot "portable_updater_common.ps1")
+Initialize-PortableUpdaterConsole
 
 function Write-Step([string]$Message) {
     Write-Host $Message
@@ -95,7 +95,8 @@ function Get-ReleaseAsset {
     return $asset
 }
 
-$PortableRoot = (Resolve-Path $PortableRoot).Path.TrimEnd('\')
+$PortableRoot = Normalize-PortableRootPath $PortableRoot
+$PortableRoot = (Resolve-Path -LiteralPath $PortableRoot).Path.TrimEnd('\')
 $TrainerDir = Join-Path $PortableRoot "SD-Trainer"
 if (-not (Test-Path (Join-Path $TrainerDir "gui.py"))) {
     throw "SD-Trainer not found under: $PortableRoot"
@@ -225,10 +226,18 @@ $rootFiles = @(
 foreach ($name in $rootFiles) {
     $src = Join-Path $stagingRoot $name
     if (Test-Path $src) {
-        Copy-Item $src -Destination (Join-Path $PortableRoot $name) -Force
+        $dest = Join-Path $PortableRoot $name
+        if ($name -like "*.bat") {
+            Write-PortableBatchFile -Source $src -Destination $dest
+        } else {
+            Copy-Item $src -Destination $dest -Force
+        }
         Write-Step "  Updated: $name"
     }
 }
+
+Write-Step "Repairing .bat line endings (CRLF) / 修复 bat 换行..."
+Repair-PortableBatchFilesInTree -Root $PortableRoot
 
 if (Test-Path (Join-Path $stagingRoot "update")) {
     $destUpdate = Join-Path $PortableRoot "update"

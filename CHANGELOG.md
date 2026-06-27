@@ -9,6 +9,13 @@
 
 相对 v2.8.2，本版 **仅版本号与后端/便携逻辑** 更新；**未** 重新合入会破坏表单挂载的 LoKr 前端 dist patch（#189 已回滚）。
 
+#### 整合包：更新脚本 hotfix（同 VERSION 重发）
+
+- **`Update-SD-Trainer.bat` / `Update-SD-Trainer-Release.bat`**：修复 `%PORTABLE_ROOT%` 尾部 `\` 导致 PowerShell `Illegal characters in path`。
+- **`.bat` CRLF**：打包与 Release 合并时强制 Windows 换行；新增 **`Fix-Portable-Bats.bat`** 修复 LF-only / UTF-8 BOM 问题。
+- **`.ps1` UTF-8 BOM**：兼容 Windows PowerShell 5.1 解析中文；bootstrap 在本地 **`UPDATER_VERSION`** 更高时不再被 GitHub main 旧脚本覆盖。
+- **`update_from_release.ps1`**：合并 Release 后自动修复根目录 `.bat` 换行。
+
 #### LoKr / 配置导出（#186，API only）
 
 - 新增 **`POST /api/config/normalize-for-export`**，供后续前端或脚本统一导出规范化。

@@ -1,11 +1,29 @@
-# Shared helpers for portable Git / Release updaters.
+﻿# Shared helpers for portable Git / Release updaters.
 $script:PortableUpdaterRepo = "wochenlong/lora-scripts-next"
 $script:PortableUpdaterBranch = "main"
+
+function Initialize-PortableUpdaterConsole {
+    try { cmd /c "chcp 65001 >nul" 2>$null | Out-Null } catch {}
+    if ($Host.Name -eq "ConsoleHost") {
+        [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
+    }
+}
+
+function Ensure-PortablePs1Utf8Bom {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not $Path.EndsWith(".ps1", [System.StringComparison]::OrdinalIgnoreCase)) { return }
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { return }
+    $text = [System.IO.File]::ReadAllText($Path, (New-Object System.Text.UTF8Encoding $false))
+    [System.IO.File]::WriteAllText($Path, $text, (New-Object System.Text.UTF8Encoding $true))
+}
 
 function Get-PortableUpdaterManifest {
     @(
         @{ Src = "build-scripts/templates/Update-SD-Trainer.bat"; Dest = "Update-SD-Trainer.bat" },
         @{ Src = "build-scripts/templates/Update-SD-Trainer-Release.bat"; Dest = "Update-SD-Trainer-Release.bat" },
+        @{ Src = "build-scripts/templates/Fix-Portable-Bats.bat"; Dest = "Fix-Portable-Bats.bat" },
         @{ Src = "scripts/portable/update_from_release.ps1"; Dest = "SD-Trainer/scripts/portable/update_from_release.ps1" },
         @{ Src = "scripts/portable/bootstrap_portable_updaters.ps1"; Dest = "SD-Trainer/scripts/portable/bootstrap_portable_updaters.ps1" },
         @{ Src = "scripts/portable/show_portable_update_status.ps1"; Dest = "SD-Trainer/scripts/portable/show_portable_update_status.ps1" },
@@ -44,7 +62,8 @@ function Invoke-PortableRawDownload {
     $lastError = ""
     foreach ($url in (Get-RawGitHubUrls $RelativePath)) {
         & curl.exe -fsSL --retry 2 --retry-delay 1 -o $Destination $url 2>$null
-        if ($LASTEXITCODE -eq 0 -and (Test-Path $Destination) -and ((Get-Item $Destination).Length -gt 0)) {
+        if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $Destination) -and ((Get-Item -LiteralPath $Destination).Length -gt 0)) {
+            Ensure-PortablePs1Utf8Bom -Path $Destination
             return $true
         }
         $lastError = "curl exit $LASTEXITCODE for $url"
@@ -86,22 +105,54 @@ function Get-RemoteLatestReleaseTag {
     }
 }
 
+function Normalize-PortableRootPath([string]$Path) {
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $Path }
+    return $Path.Trim().Trim('"').TrimEnd('\', '/')
+}
+
+function Write-PortableBatchFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+    if (-not (Test-Path $Source)) {
+        throw "Batch source not found: $Source"
+    }
+    $dir = Split-Path $Destination -Parent
+    if ($dir -and -not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    $text = [System.IO.File]::ReadAllText($Source)
+    $text = $text -replace "`r`n", "`n" -replace "`r", "`n" -replace "`n", "`r`n"
+    if ($text.Length -gt 0 -and [int][char]$text[0] -eq 0xFEFF) {
+        $text = $text.Substring(1)
+    }
+    [System.IO.File]::WriteAllText($Destination, $text, (New-Object System.Text.UTF8Encoding $false))
+}
+
+function Repair-PortableBatchFilesInTree {
+    param([Parameter(Mandatory = $true)][string]$Root)
+    Get-ChildItem -Path $Root -Filter "*.bat" -Recurse -File | ForEach-Object {
+        Write-PortableBatchFile -Source $_.FullName -Destination $_.FullName
+    }
+}
+
 function Read-LocalProductVersion([string]$TrainerDir) {
     $path = Join-Path $TrainerDir "VERSION"
-    if (-not (Test-Path $path)) { return "" }
-    return ((Get-Content $path -TotalCount 1) -join "").Trim()
+    if (-not (Test-Path -LiteralPath $path)) { return "" }
+    return ((Get-Content -LiteralPath $path -TotalCount 1) -join "").Trim()
 }
 
 function Read-LocalPortableBuild([string]$TrainerDir) {
     $path = Join-Path $TrainerDir "PORTABLE_BUILD"
-    if (-not (Test-Path $path)) { return "" }
-    return ((Get-Content $path -TotalCount 1) -join "").Trim()
+    if (-not (Test-Path -LiteralPath $path)) { return "" }
+    return ((Get-Content -LiteralPath $path -TotalCount 1) -join "").Trim()
 }
 
 function Read-LocalUpdaterVersion([string]$TrainerDir) {
     $path = Join-Path $TrainerDir "scripts/portable/UPDATER_VERSION"
-    if (-not (Test-Path $path)) { return "unknown" }
-    return ((Get-Content $path -TotalCount 1) -join "").Trim()
+    if (-not (Test-Path -LiteralPath $path)) { return "unknown" }
+    return ((Get-Content -LiteralPath $path -TotalCount 1) -join "").Trim()
 }
 
 function Get-LocalGitCommit([string]$TrainerDir) {
@@ -120,7 +171,7 @@ function Write-PortableUpdateStatusBanner {
         [string]$UpdaterLabel = "Portable",
         [string]$UpdaterFile = ""
     )
-    $PortableRoot = $PortableRoot.TrimEnd('\')
+    $PortableRoot = Normalize-PortableRootPath $PortableRoot
     $trainerDir = Join-Path $PortableRoot "SD-Trainer"
     $localVersion = Read-LocalProductVersion $trainerDir
     $localBuild = Read-LocalPortableBuild $trainerDir
@@ -131,6 +182,7 @@ function Write-PortableUpdateStatusBanner {
     $remoteRelease = Get-RemoteLatestReleaseTag
     $remoteUpdater = Get-RemoteUpdaterVersionOnline
 
+    Initialize-PortableUpdaterConsole
     Write-Host "--- Package status / 当前整合包 ---"
     Write-Host ("  VERSION (local / 当前): " + $(if ($localVersion) { $localVersion } else { "(missing)" }))
     if ($localBuild) { Write-Host "  PORTABLE_BUILD (local / 当前): $localBuild" }
