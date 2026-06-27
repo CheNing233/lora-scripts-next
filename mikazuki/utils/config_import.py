@@ -398,13 +398,17 @@ _LYCORIS_ALGO_TO_LORA_TYPE = {
 }
 
 
+def _is_invalid_import_scalar(value: str) -> bool:
+    return value.strip().lower() in {"", "undefined", "null", "nan"}
+
+
 def _parse_network_arg_item(item: Any) -> tuple[str, str] | None:
     if not isinstance(item, str) or "=" not in item:
         return None
     key, value = item.split("=", 1)
     key = key.strip()
     value = value.strip()
-    if not key:
+    if not key or _is_invalid_import_scalar(value):
         return None
     return key, value
 
@@ -446,7 +450,7 @@ def _hydrate_lycoris_ui_fields_from_network_args(config: dict) -> None:
         if ui_field in config and config[ui_field] not in (None, ""):
             continue
         raw_value = parsed.get(arg_key)
-        if raw_value is None:
+        if raw_value is None or _is_invalid_import_scalar(raw_value):
             continue
         config[ui_field] = _coerce_import_scalar(
             raw_value,

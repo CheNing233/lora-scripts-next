@@ -45,7 +45,11 @@
 | Python | `python_embeded` | 系统 / `venv` |
 | 入口 | `run_gui.bat` → `launch_portable.bat` | `run_gui.bat` → `run_gui_source.bat` |
 | 首次依赖 | `setup_environment.py` | `install-cn.ps1` |
-| 默认打标模型 | 7z 内置 `tagger-models/wd14/wd14-convnextv2-v2/`，并保留 `huggingface/` 缓存兜底 | `install-cn.ps1` + 每次启动 `prefetch_default_tagger.py --if-missing` |
+| 默认打标模型 | 7z 内置 `tagger-models/wd14/wd14-convnextv2-v2/`，其它模型需联网从 Hugging Face 下载 | `install-cn.ps1` + 每次启动 `prefetch_default_tagger.py --if-missing` |
+| Hub 下载策略 | `MIKAZUKI_HUB_BACKEND=auto`（不强制魔搭）；内置 tokenizer/默认打标优先本地 | 源码 `auto`，按网络自动选择 |
+| 文件选择器 | 启动时把 `sd-models/`、`output/`、`logs/`、`train/` 联接进 `SD-Trainer/`（`link_portable_data_dirs.py`） | 数据目录本来就在项目根 |
+
+启动后**终端窗口**会显示打标模型下载进度与错误提示；不要关闭该窗口。
 
 ## 打标模型目录
 

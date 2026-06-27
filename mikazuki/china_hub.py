@@ -19,6 +19,10 @@ import os
 from typing import Any, Callable
 
 _PATCHED = False
+_ORIGINAL_HF_HUB_DOWNLOAD: Callable[..., Any] | None = None
+
+# WD/CL tagger ONNX repos are Hugging Face–only; ModelScope returns 404 for them.
+_HF_ONLY_REPO_PREFIXES = ("SmilingWolf/", "cella110n/")
 
 # Hugging Face repo id → ModelScope repo id.
 #
@@ -49,6 +53,34 @@ def remap_hf_repo_id(repo_id: str) -> str:
     return HF_TO_MODELSCOPE_REPOS.get(repo_id, repo_id)
 
 
+def is_hf_only_repo(repo_id: str) -> bool:
+    """Repos that must download from huggingface.co (not ModelScope)."""
+    return str(repo_id or "").startswith(_HF_ONLY_REPO_PREFIXES)
+
+
+def _hf_hub_download_direct(*args: Any, **kwargs: Any) -> Any:
+    """Download via pre-patch huggingface_hub (bypass ModelScope patch)."""
+    if _ORIGINAL_HF_HUB_DOWNLOAD is None:
+        import huggingface_hub
+
+        return huggingface_hub.hf_hub_download(*args, **kwargs)
+
+    prev_endpoint = os.environ.get("HF_ENDPOINT")
+    try:
+        # hf-mirror only mirrors metadata; large ONNX files must come from hf.co.
+        os.environ.pop("HF_ENDPOINT", None)
+        if args:
+            args = (remap_hf_repo_id(str(args[0])), *args[1:])
+        if kwargs.get("repo_id") is not None:
+            kwargs = {**kwargs, "repo_id": remap_hf_repo_id(str(kwargs["repo_id"]))}
+        return _ORIGINAL_HF_HUB_DOWNLOAD(*args, **kwargs)
+    finally:
+        if prev_endpoint is None:
+            os.environ.pop("HF_ENDPOINT", None)
+        else:
+            os.environ["HF_ENDPOINT"] = prev_endpoint
+
+
 def hub_backend() -> str:
     """Return ``modelscope`` or ``huggingface`` for download routing."""
     explicit = (os.environ.get("MIKAZUKI_HUB_BACKEND") or "auto").strip().lower()
@@ -75,6 +107,9 @@ def hub_backend() -> str:
 
 def _wrap_repo_remap(fn: Callable[..., Any]) -> Callable[..., Any]:
     def wrapped(*args: Any, **kwargs: Any) -> Any:
+        repo_id = str(kwargs.get("repo_id") or (args[0] if args else ""))
+        if is_hf_only_repo(repo_id):
+            return _hf_hub_download_direct(*args, **kwargs)
         if args:
             args = (remap_hf_repo_id(str(args[0])), *args[1:])
         if kwargs.get("repo_id") is not None:
@@ -132,7 +167,7 @@ def enable_china_hub(*, force: bool = False) -> bool:
 
     Safe to call multiple times. Returns True when ModelScope patch is active.
     """
-    global _PATCHED
+    global _PATCHED, _ORIGINAL_HF_HUB_DOWNLOAD
     if _PATCHED:
         return True
     if not force and hub_backend() != "modelscope":
@@ -142,6 +177,14 @@ def enable_china_hub(*, force: bool = False) -> bool:
         from modelscope.utils.hf_util import patch_hub
     except ImportError:
         return False
+
+    try:
+        import huggingface_hub
+
+        if _ORIGINAL_HF_HUB_DOWNLOAD is None:
+            _ORIGINAL_HF_HUB_DOWNLOAD = huggingface_hub.hf_hub_download
+    except ImportError:
+        pass
 
     try:
         import diffusers  # noqa: F401
