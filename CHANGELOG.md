@@ -3,6 +3,17 @@
 本文件记录 **wochenlong/lora-scripts-next** 面向镜像与 AutoDL 的发行说明；上游 kohya-ss/sd-scripts 的变更请见其仓库。
 
 ---
+## v2.8.35 — 2026-06-28
+
+### 整合包（更新脚本 hotfix + 版本号）
+
+相对 v2.8.3 整合包 7z，本版 **`VERSION` / UI 芯片为 v2.8.35**，便于区分已含更新脚本修复的构建；**无前端 layout/app bundle 变更**。
+
+- **`Update-SD-Trainer.bat` / `Update-SD-Trainer-Release.bat`**：路径引号、`CRLF`、PowerShell 5.1 UTF-8 BOM（`UPDATER_VERSION` 4）
+- 新增 **`Fix-Portable-Bats.bat`**
+- 仍含 v2.8.3 后端/Hub/junction 等更新；SPA 仍为稳定 dist（`20260627-config-import`）
+
+---
 ## v2.8.3 — 2026-06-28
 
 ### 后端与整合包（无前端 layout 变更）
