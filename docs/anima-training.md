@@ -1,5 +1,7 @@
 # Anima LoRA 训练指南
 
+> **从 SDXL 过来？** 建议先看 **[Anima LoRA 主要参数说明（写给 SDXL 用户）](./anima-lora-parameters-sdxl.md)** — 按「你想调什么效果」整理，对照 SDXL 习惯说明哪些要改、哪些可以照旧。
+
 ## 进入训练页面
 
 启动 WebUI 后，左侧 sidebar 点 **Anima LoRA** 进入。
