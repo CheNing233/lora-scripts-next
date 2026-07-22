@@ -151,6 +151,42 @@ def resolution_pair(value: Any, default: int = 1024) -> list[int]:
     return [default, default]
 
 
+def normalize_bucket_resolution(values: dict[str, Any], warnings: list[str]) -> None:
+    if not truthy(values.get("enable_bucket", True)):
+        return
+
+    width, height = resolution_pair(values.get("resolution"))
+    required_max = max(width, height)
+    bucket_step = int_value(values.get("bucket_reso_steps"), 64)
+    if bucket_step <= 0:
+        raise AdapterError("bucket_reso_steps must be greater than 0")
+
+    configured_max = int_value(values.get("max_bucket_reso"), 0)
+    if configured_max <= 0:
+        effective_max = max(1024, required_max)
+        effective_max = ((effective_max + bucket_step - 1) // bucket_step) * bucket_step
+        values["max_bucket_reso"] = effective_max
+        if effective_max > 1024:
+            warnings.append(
+                f"max_bucket_reso 未设置，已按 resolution 自动设为 {effective_max}"
+            )
+        return
+
+    effective_max = ((configured_max + bucket_step - 1) // bucket_step) * bucket_step
+    if effective_max < required_max:
+        resolution_text = str(values.get("resolution", f"{width},{height}"))
+        raise AdapterError(
+            f"max_bucket_reso={configured_max} 小于 resolution={resolution_text}；"
+            f"请设置为至少 {required_max}，或留空自动计算"
+        )
+    if effective_max != configured_max:
+        values["max_bucket_reso"] = effective_max
+        warnings.append(
+            f"max_bucket_reso 已按 bucket_reso_steps 从 {configured_max} "
+            f"向上调整为 {effective_max}"
+        )
+
+
 def normalize_kv_args(values: Any) -> list[str]:
     if not isinstance(values, list):
         return []
@@ -333,6 +369,8 @@ def adapt_config(source: dict[str, Any], runtime: RuntimeConfig, run_id: str) ->
         if repeats > 0:
             values["dataset_repeats"] = repeats
             break
+
+    normalize_bucket_resolution(values, warnings)
 
     values.setdefault("torch_compile", True)
     values.setdefault("static_token_count", 4096)

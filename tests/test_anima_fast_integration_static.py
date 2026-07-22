@@ -21,6 +21,15 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertIn('"EmoSens"', shared[: shared.index("ANIMA_FAST_LR_OPTIMIZER")])
         self.assertIn('Schema.const("lora")', schema)
 
+    def test_fast_schema_exposes_bucket_resolution_controls(self):
+        schema = Path("mikazuki/schema/anima-lora-fast.ts").read_text(encoding="utf-8")
+
+        self.assertIn("min_bucket_reso:", schema)
+        self.assertIn("max_bucket_reso:", schema)
+        self.assertIn("bucket_reso_steps:", schema)
+        self.assertIn("bucket_no_upscale:", schema)
+        self.assertIn("留空时按训练分辨率自动设置", schema)
+
     def test_fast_adapter_does_not_whitelist_emosens(self):
         adapter = Path("mikazuki/anima_fast_backend/adapter.py").read_text(encoding="utf-8")
         self.assertIn("FAST_SUPPORTED_OPTIMIZERS", adapter)

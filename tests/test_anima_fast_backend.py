@@ -296,6 +296,72 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(adapted.values["static_token_count"], 9216)
         self.assertTrue(any("static_token_count" in warning for warning in adapted.warnings))
 
+    def test_adapt_config_derives_max_bucket_reso_for_high_resolution(self):
+        with tempfile.TemporaryDirectory() as td:
+            runtime = make_runtime(Path(td))
+            adapted = adapt_config({
+                "lora_type": "lora",
+                "resolution": "1536,1536",
+                "enable_bucket": True,
+            }, runtime, "run-1")
+
+        self.assertEqual(adapted.values["max_bucket_reso"], 1536)
+        self.assertTrue(any("max_bucket_reso" in warning for warning in adapted.warnings))
+        self.assertIn("max_bucket_reso = 1536", dump_fast_dataset_toml(adapted.values))
+
+    def test_adapt_config_preserves_valid_user_max_bucket_reso(self):
+        with tempfile.TemporaryDirectory() as td:
+            runtime = make_runtime(Path(td))
+            adapted = adapt_config({
+                "lora_type": "lora",
+                "resolution": "1536,1536",
+                "enable_bucket": True,
+                "max_bucket_reso": 2048,
+            }, runtime, "run-1")
+
+        self.assertEqual(adapted.values["max_bucket_reso"], 2048)
+        self.assertFalse(any("max_bucket_reso" in warning for warning in adapted.warnings))
+
+    def test_adapt_config_rejects_max_bucket_reso_below_resolution(self):
+        with tempfile.TemporaryDirectory() as td:
+            runtime = make_runtime(Path(td))
+            with self.assertRaisesRegex(
+                AdapterError,
+                "max_bucket_reso=1024.*resolution=1536,1536",
+            ):
+                adapt_config({
+                    "lora_type": "lora",
+                    "resolution": "1536,1536",
+                    "enable_bucket": True,
+                    "max_bucket_reso": 1024,
+                }, runtime, "run-1")
+
+    def test_adapt_config_rounds_max_bucket_reso_to_bucket_step(self):
+        with tempfile.TemporaryDirectory() as td:
+            runtime = make_runtime(Path(td))
+            adapted = adapt_config({
+                "lora_type": "lora",
+                "resolution": "1536,1536",
+                "enable_bucket": True,
+                "max_bucket_reso": 1550,
+                "bucket_reso_steps": 64,
+            }, runtime, "run-1")
+
+        self.assertEqual(adapted.values["max_bucket_reso"], 1600)
+        self.assertTrue(any("1550" in warning and "1600" in warning for warning in adapted.warnings))
+
+    def test_adapt_config_derives_bucket_limit_when_no_upscale_is_enabled(self):
+        with tempfile.TemporaryDirectory() as td:
+            runtime = make_runtime(Path(td))
+            adapted = adapt_config({
+                "lora_type": "lora",
+                "resolution": "1536,1536",
+                "enable_bucket": True,
+                "bucket_no_upscale": True,
+            }, runtime, "run-1")
+
+        self.assertEqual(adapted.values["max_bucket_reso"], 1536)
+
     def test_adapt_config_ignores_unsupported_fast_memory_fields(self):
         with tempfile.TemporaryDirectory() as td:
             runtime = make_runtime(Path(td))
