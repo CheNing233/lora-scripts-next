@@ -407,6 +407,64 @@ class AnimaFastEnvironmentInstallerTests(unittest.TestCase):
 
         self.assertEqual(captured["env"].get("HF_ENDPOINT"), "https://modelscope.cn")
 
+    def test_install_streaming_uses_windows_system_certificates_by_default(self):
+        from mikazuki.anima_fast_backend.environment import _run_streaming_once
+
+        captured: dict = {}
+
+        class _FakeStdout:
+            def readline(self):
+                return ""
+
+        class _FakeProc:
+            def __init__(self, *a, **k):
+                self.stdout = _FakeStdout()
+                captured["env"] = k.get("env")
+
+            def wait(self):
+                return 0
+
+        env_without_uv_certs = {
+            key: value
+            for key, value in os.environ.items()
+            if key not in {"UV_SYSTEM_CERTS", "UV_NATIVE_TLS"}
+        }
+        with tempfile.TemporaryDirectory() as td, \
+            mock.patch("mikazuki.anima_fast_backend.environment.subprocess.Popen", _FakeProc), \
+            mock.patch("mikazuki.anima_fast_backend.environment.sys.platform", "win32"), \
+            mock.patch.dict("os.environ", env_without_uv_certs, clear=True):
+            _run_streaming_once(["uv", "pip", "install"], Path(td), lambda _line: None)
+
+        self.assertEqual(captured["env"].get("UV_SYSTEM_CERTS"), "true")
+
+    def test_install_streaming_explains_unknown_certificate_issuer(self):
+        from mikazuki.anima_fast_backend.environment import _run_streaming_once
+
+        lines = iter([
+            "error sending request for url\n",
+            "invalid peer certificate: UnknownIssuer\n",
+        ])
+
+        class _FakeStdout:
+            def readline(self):
+                return next(lines, "")
+
+        class _FakeProc:
+            def __init__(self, *a, **k):
+                self.stdout = _FakeStdout()
+
+            def wait(self):
+                return 1
+
+        logs: list[str] = []
+        with tempfile.TemporaryDirectory() as td, \
+            mock.patch("mikazuki.anima_fast_backend.environment.subprocess.Popen", _FakeProc):
+            with self.assertRaises(subprocess.CalledProcessError):
+                _run_streaming_once(["uv", "pip", "install"], Path(td), logs.append)
+
+        self.assertTrue(any("UV_SYSTEM_CERTS=true" in line for line in logs))
+        self.assertTrue(any("HTTPS" in line and "certificate" in line for line in logs))
+
     def test_audit_environment_skips_triton_windows_on_linux(self):
         with tempfile.TemporaryDirectory() as td, mock.patch(
             "mikazuki.anima_fast_backend.environment.sys.platform", "linux"

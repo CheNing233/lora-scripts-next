@@ -310,6 +310,12 @@ def _run_streaming_once(command: list[str], cwd: Path, log: LogFn, env: dict[str
     merged_env = os.environ.copy()
     if env:
         merged_env.update(env)
+    if (
+        sys.platform == "win32"
+        and "UV_SYSTEM_CERTS" not in merged_env
+        and "UV_NATIVE_TLS" not in merged_env
+    ):
+        merged_env["UV_SYSTEM_CERTS"] = "true"
     merged_env.update({
         "PYTHONIOENCODING": "utf-8",
         "PYTHONUNBUFFERED": "1",
@@ -333,11 +339,23 @@ def _run_streaming_once(command: list[str], cwd: Path, log: LogFn, env: dict[str
         bufsize=1,
     )
     assert completed.stdout is not None
+    unknown_certificate_issuer = False
     for line in iter(completed.stdout.readline, ""):
-        _append(log, line.rstrip("\r\n"))
+        clean_line = line.rstrip("\r\n")
+        if "unknownissuer" in clean_line.lower():
+            unknown_certificate_issuer = True
+        _append(log, clean_line)
     returncode = completed.wait()
     _append(log, f"[exit] returncode={returncode}")
     if returncode != 0:
+        if unknown_certificate_issuer:
+            _append(log, "[hint] HTTPS certificate verification failed (UnknownIssuer).")
+            _append(
+                log,
+                "[hint] Windows: ensure the proxy or antivirus root CA is trusted; "
+                "the installer enables UV_SYSTEM_CERTS=true by default.",
+            )
+            _append(log, "[hint] For older uv versions, set UV_NATIVE_TLS=true before retrying.")
         raise subprocess.CalledProcessError(returncode, command)
 
 

@@ -294,6 +294,7 @@ Fast 页优化器下拉**仅列出当前 anima_lora 插件快照已支持的选�
 |------|------|
 | 状态「进阶插件 · 待开启」 | 运行 `scripts/cli/install_anima_fast.*` 安装（推荐，终端可见报错）；或在页内点「开启插件」 |
 | 安装失败 / 审计失败 | 优先用 CLI 脚本重装看终端报错；亦可看页内日志或 `POST /api/plugins/anima-lora/repair` |
+| `invalid peer certificate: UnknownIssuer` | Windows 安装器会默认使用系统证书库；若仍失败，请确认代理或杀毒软件的根证书已受 Windows 信任，也可换网络重试。旧版 uv 可在安装前设置 `$env:UV_NATIVE_TLS="true"` |
 | `No bitsandbytes` / 优化器 ImportError | 修复插件；或确认 `optimizer_type=AdamW` 临时绕过 |
 | 末 epoch 报 accelerate / `NoneType is not iterable` | torch 的 `.dist-info` 损坏；**修复插件** 或重装 `torch==2.11.0+cu130` |
 | 训练按钮灰色 | 插件未就绪；先安装 |
