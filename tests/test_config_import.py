@@ -143,12 +143,23 @@ class ConfigImportTests(unittest.TestCase):
         self.assertTrue(result["config"]["enable_preview"])
 
     def test_cannot_import_toml_lokr_preview_signals(self):
-        from pathlib import Path
-
         import toml
 
         cfg = toml.loads(
-            Path("tmp/cannot-import.toml").read_text(encoding="utf-8")
+            """
+model_train_type = "anima-lora"
+lora_type = "lokr"
+network_module = "lycoris.kohya"
+positive_prompts = "portrait"
+network_args = [
+  "conv_dim=16",
+  "conv_alpha=1",
+  "dropout=0",
+  "algo=lokr",
+  "factor=-1"
+]
+optimizer_args = ["decouple=True", "weight_deca"]
+"""
         )
         result = validate_config_import("sd3-lora", cfg)
         self.assertEqual(result["result"], "ok")
