@@ -73,6 +73,15 @@ def test_portable_builder_bundles_visible_tagger_models_directory():
     assert "MIKAZUKI_TAGGER_MODELS_DIR" in launcher
 
 
+def test_portable_archive_excludes_trainer_data_junctions():
+    script = (ROOT / "build-scripts" / "build_portable.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    for name in ("sd-models", "output", "logs", "train", "tagger-models"):
+        assert f"-xr!SD-Trainer\\{name}" in script
+
+
 def test_portable_builder_bundles_dual_update_scripts():
     script = (ROOT / "build-scripts" / "build_portable.ps1").read_text(
         encoding="utf-8"

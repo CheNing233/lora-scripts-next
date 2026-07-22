@@ -738,8 +738,18 @@ if (-not $Skip7z) {
         $archivePath = Join-Path $buildDir $archiveName
         if (Test-Path $archivePath) { Remove-Item $archivePath -Force }
 
+        # 7-Zip follows Windows directory junctions. These paths point back to
+        # portable-root data directories, so archiving them would duplicate
+        # large assets such as the bundled WD14 ONNX model.
+        $archiveExcludes = @(
+            "-xr!SD-Trainer\sd-models",
+            "-xr!SD-Trainer\output",
+            "-xr!SD-Trainer\logs",
+            "-xr!SD-Trainer\train",
+            "-xr!SD-Trainer\tagger-models"
+        )
         Write-Host "  Compressing..."
-        & $7zExe a -t7z -mx=9 -m0=LZMA2:d=64m -mmt=on $archivePath "$portableDir\*" | Out-Null
+        & $7zExe a -t7z -mx=9 -m0=LZMA2:d=64m -mmt=on $archivePath "$portableDir\*" @archiveExcludes | Out-Null
 
         $sizeBytes = (Get-Item $archivePath).Length
         $sizeMB = [math]::Round($sizeBytes / 1MB, 1)
