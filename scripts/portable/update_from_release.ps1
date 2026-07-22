@@ -77,6 +77,10 @@ function Get-ReleaseAsset {
         [string]$PreferredAssetName = ""
     )
     $headers = @{ "User-Agent" = "SD-Trainer-Portable-Updater" }
+    $githubToken = if ($env:GITHUB_TOKEN) { $env:GITHUB_TOKEN } else { $env:GH_TOKEN }
+    if ($githubToken) {
+        $headers["Authorization"] = "Bearer $githubToken"
+    }
     if ($TagName) {
         $uri = "https://api.github.com/repos/$Repository/releases/tags/$TagName"
     } else {
