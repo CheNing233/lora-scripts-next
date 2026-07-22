@@ -3,6 +3,29 @@
 本文件记录 **wochenlong/lora-scripts-next** 面向镜像与 AutoDL 的发行说明；上游 kohya-ss/sd-scripts 的变更请见其仓库。
 
 ---
+## v2.9.0 — 2026-07-22
+
+### Anima Fast
+
+- 高于 1024 的训练分辨率会自动计算 `max_bucket_reso`，并开放最小/最大桶分辨率、桶步长与禁止放大选项（#196）。
+- 用户手动填写的最大桶分辨率过小时，在训练启动前给出明确提示；非桶步长倍数会自动向上调整。
+- Windows 安装 Fast 插件时，uv 默认使用系统证书库；`UnknownIssuer` 会显示代理、杀毒软件和旧版 uv 排障提示（#195）。
+
+### LoKr 配置
+
+- 修复 Anima 标准模式 LoKr 参数预览与下载配置中出现 `conv_dim=undefined` 等无效值的问题（#186）。
+- 清理逻辑仅在 Anima 标准模式页加载，支持 SPA 跳转，不修改共享前端主 bundle。
+
+### 本地打标
+
+- `wd-vit-v3`、`wd14-moat-v2` 优先使用本地模型目录，不再在本地文件齐全时访问 Hugging Face（#194）。
+- 兼容旧目录名称，并支持直接使用完整的 Hugging Face 本地缓存。
+
+### 文档
+
+- 新增面向 SDXL 用户的 Anima LoRA 参数迁移说明（#193）。
+
+---
 ## v2.8.35 — 2026-06-28
 
 ### 整合包（更新脚本 hotfix + 版本号）
