@@ -27,9 +27,13 @@
   install_xformers.bat
   python_embeded/
   SD-Trainer/
-  sd-models/
-  output/
-  logs/
+    sd-models/          # 模型（内置文件选择器 cwd 相对路径）
+    output/             # 训练输出
+    logs/
+    train/
+  sd-models/            # junction -> SD-Trainer/sd-models（兼容旧路径）
+  output/               # junction -> SD-Trainer/output
+  logs/                 # junction -> SD-Trainer/logs
   huggingface/
   tagger-models/
   tagger-models/wd14/
@@ -134,10 +138,11 @@ Release 更新实现：`SD-Trainer/scripts/portable/update_from_release.ps1`
 **Release 合并时保留**（不覆盖）：
 
 ```text
-sd-models/  output/  logs/  huggingface/  tagger-models/
+sd-models/  output/  logs/  train/   # 整合包根：junction，指向 SD-Trainer 内同名目录
+huggingface/  tagger-models/
+SD-Trainer/sd-models/  SD-Trainer/output/  SD-Trainer/logs/  SD-Trainer/train/  # 实际数据
 SD-Trainer/extensions/          # Anima Fast 插件（若已安装）
 SD-Trainer/config/autosave/
-SD-Trainer/output/  SD-Trainer/logs/
 SD-Trainer/.cache/
 ```
 

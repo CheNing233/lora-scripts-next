@@ -1,9 +1,12 @@
-"""Create directory junctions inside SD-Trainer/ -> portable root data dirs.
+"""Ensure portable user data lives under SD-Trainer/ (file picker cwd).
 
-Portable layout keeps user data at <PortableRoot>/{sd-models,output,...} while
-gui.py runs with cwd=<PortableRoot>/SD-Trainer. The built-in file picker lists
-./sd-models and ./output relative to cwd, so we junction those names into the
-trainer directory on Windows portable builds.
+Canonical layout (v2.8.36+):
+  <PortableRoot>/SD-Trainer/{sd-models,output,logs,train}/  — real folders
+  <PortableRoot>/{sd-models,output,logs,train}/              — junctions -> above
+
+Legacy layout (pre-#191 flip):
+  data at portable root; SD-Trainer/<name> junction -> ../<name>
+  Migrated on launch/build by moving data into SD-Trainer and reversing junctions.
 """
 
 from __future__ import annotations
@@ -15,12 +18,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-PORTABLE_DATA_DIR_NAMES = (
+# tagger-models stays at portable root (MIKAZUKI_TAGGER_MODELS_DIR).
+TRAINER_CANONICAL_DIR_NAMES = (
     "sd-models",
     "output",
     "logs",
     "train",
-    "tagger-models",
 )
 
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
@@ -53,7 +56,6 @@ def _is_reparse_point(path: Path) -> bool:
 
 
 def _junction_target(link: Path) -> Path | None:
-    """Best-effort resolve of a directory junction target on Windows."""
     if not _is_reparse_point(link):
         return None
     try:
@@ -73,7 +75,39 @@ def _create_junction(link: Path, target: Path) -> None:
     )
 
 
-def link_portable_data_dir(
+def _remove_junction(link: Path) -> None:
+    if _is_reparse_point(link):
+        link.rmdir()
+
+
+def _dir_entries(path: Path) -> list[Path]:
+    if not path.is_dir() or _is_reparse_point(path):
+        return []
+    return list(path.iterdir())
+
+
+def _path_or_reparse_exists(path: Path) -> bool:
+    return path.exists() or _is_reparse_point(path)
+
+
+def _conflict_destination(path: Path) -> Path:
+    candidate = path.with_name(f"{path.name}.portable-root")
+    index = 2
+    while _path_or_reparse_exists(candidate):
+        candidate = path.with_name(f"{path.name}.portable-root-{index}")
+        index += 1
+    return candidate
+
+
+def _move_entries_preserving_conflicts(source: Path, destination: Path) -> None:
+    for item in source.iterdir():
+        target = destination / item.name
+        if _path_or_reparse_exists(target):
+            target = _conflict_destination(target)
+        shutil.move(str(item), str(target))
+
+
+def ensure_portable_data_dir(
     trainer_dir: Path,
     portable_root: Path,
     name: str,
@@ -81,41 +115,85 @@ def link_portable_data_dir(
     log=print,
 ) -> str:
     """
-    Ensure trainer_dir/name junctions to portable_root/name.
+    Ensure trainer_dir/name is the real data folder; portable_root/name junctions to it.
 
-    Returns: linked | skipped | replaced-empty | kept-nonempty
+    Returns: linked-outer | migrated-flip | migrated-outer-to-inner | skipped | failed
     """
-    target = portable_root / name
-    link = trainer_dir / name
-    target.mkdir(parents=True, exist_ok=True)
+    inner = trainer_dir / name
+    outer = portable_root / name
 
-    if link.exists() or link.is_symlink():
-        if _is_reparse_point(link):
-            existing = _junction_target(link)
-            if existing is not None and existing.resolve() == target.resolve():
-                return "skipped"
-            log(f"[portable] {name}: junction exists -> {existing}; expected {target}")
-            return "skipped"
-
-        if link.is_dir():
-            entries = list(link.iterdir())
-            if entries:
-                log(
-                    f"[portable] {name}: keep existing folder inside SD-Trainer "
-                    f"({len(entries)} item(s)); file picker uses this copy, not {target}"
-                )
-                return "kept-nonempty"
-            shutil.rmtree(link)
-            _create_junction(link, target)
-            log(f"[portable] linked {link} -> {target} (replaced empty folder)")
-            return "replaced-empty"
-
-        log(f"[portable] {name}: skip non-directory path {link}")
+    # --- Legacy: inner junction pointed at outer (data physically outside SD-Trainer) ---
+    if _is_reparse_point(inner):
+        existing_inner_tgt = _junction_target(inner)
+        points_to_outer = (
+            existing_inner_tgt is not None
+            and existing_inner_tgt.resolve() == outer.resolve()
+        )
+        outer_is_real_dir = outer.is_dir() and not _is_reparse_point(outer)
+        if points_to_outer or outer_is_real_dir:
+            _remove_junction(inner)
+            if outer_is_real_dir:
+                if inner.exists():
+                    shutil.rmtree(inner)
+                shutil.move(str(outer), str(inner))
+            else:
+                inner.mkdir(parents=True, exist_ok=True)
+            if _path_or_reparse_exists(outer):
+                if _is_reparse_point(outer):
+                    _remove_junction(outer)
+                elif outer.is_dir():
+                    shutil.rmtree(outer)
+            _create_junction(outer, inner)
+            log(f"[portable] migrated {name}: data now under SD-Trainer (root is junction)")
+            return "migrated-flip"
+        log(
+            f"[portable] {name}: keep existing inner junction -> {existing_inner_tgt}; "
+            "portable-root data folder is unavailable"
+        )
         return "skipped"
 
-    _create_junction(link, target)
-    log(f"[portable] linked {link} -> {target}")
-    return "linked"
+    inner.mkdir(parents=True, exist_ok=True)
+
+    # --- Outer real folder with data: merge into SD-Trainer without overwriting ---
+    if outer.exists() and not _is_reparse_point(outer):
+        outer_entries = _dir_entries(outer)
+        if outer_entries:
+            _move_entries_preserving_conflicts(outer, inner)
+            shutil.rmtree(outer)
+            _create_junction(outer, inner)
+            log(f"[portable] migrated {name}: moved portable-root data into SD-Trainer")
+            return "migrated-outer-to-inner"
+
+    # --- Ensure outer junction -> inner ---
+    if _is_reparse_point(outer):
+        existing_outer_tgt = _junction_target(outer)
+        if existing_outer_tgt is not None and existing_outer_tgt.resolve() == inner.resolve():
+            return "skipped"
+        _remove_junction(outer)
+    elif outer.exists():
+        if outer.is_dir() and not _dir_entries(outer):
+            shutil.rmtree(outer)
+        else:
+            log(
+                f"[portable] {name}: keep portable-root folder ({len(_dir_entries(outer))} item(s)); "
+                f"file picker uses SD-Trainer\\{name}"
+            )
+            return "skipped"
+
+    _create_junction(outer, inner)
+    log(f"[portable] linked {outer} -> {inner}")
+    return "linked-outer"
+
+
+def link_portable_data_dir(
+    trainer_dir: Path,
+    portable_root: Path,
+    name: str,
+    *,
+    log=print,
+) -> str:
+    """Backward-compatible alias."""
+    return ensure_portable_data_dir(trainer_dir, portable_root, name, log=log)
 
 
 def link_all_portable_data_dirs(
@@ -125,13 +203,13 @@ def link_all_portable_data_dirs(
 ) -> dict[str, str]:
     trainer_dir, portable_root = resolve_portable_roots(trainer_dir)
     if not is_portable_layout(trainer_dir, portable_root):
-        log("[portable] not a portable layout; skip data-dir junctions")
+        log("[portable] not a portable layout; skip data-dir layout")
         return {}
 
     results: dict[str, str] = {}
-    for name in PORTABLE_DATA_DIR_NAMES:
+    for name in TRAINER_CANONICAL_DIR_NAMES:
         try:
-            results[name] = link_portable_data_dir(
+            results[name] = ensure_portable_data_dir(
                 trainer_dir,
                 portable_root,
                 name,

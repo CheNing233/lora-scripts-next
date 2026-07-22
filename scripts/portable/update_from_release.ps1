@@ -194,7 +194,8 @@ $robocopyArgs = @(
     $TrainerDir,
     "/E", "/IS", "/IT", "/R:2", "/W:2", "/NFL", "/NDL", "/NJH", "/NJS", "/NC", "/NS",
     "/XD", "extensions", ".cache", "__pycache__", "node_modules", ".vscode", ".cursor",
-    "/XD", "config\autosave", "output", "logs"
+    "/XD", "config", "sd-models", "output", "logs", "train",
+    "/XF", (Join-Path $stagingTrainer "assets\config.json")
 )
 & robocopy @robocopyArgs | Out-Null
 if ($LASTEXITCODE -ge 8) {
@@ -276,7 +277,9 @@ if ($newVersion -and $currentVersion -and $newVersion -eq $currentVersion -and $
 }
 Write-Step ""
 Write-Step 'Preserved / user data kept:'
-Write-Step '  sd-models\  output\  logs\  huggingface\  tagger-models\'
+Write-Step '  SD-Trainer\sd-models\  SD-Trainer\output\  SD-Trainer\logs\  SD-Trainer\train\'
+Write-Step '  SD-Trainer\config\  SD-Trainer\assets\config.json'
+Write-Step '  huggingface\  tagger-models\  (portable root)'
 Write-Step '  SD-Trainer\extensions\  (Anima Fast plugin, if installed)'
 Write-Step ""
 if ($newVersion -and $currentVersion -and ($newVersion -ne $currentVersion -or ($newBuild -and $newBuild -ne $currentBuild))) {

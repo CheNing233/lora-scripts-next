@@ -21,6 +21,12 @@
 - `wd-vit-v3`、`wd14-moat-v2` 优先使用本地模型目录，不再在本地文件齐全时访问 Hugging Face（#194）。
 - 兼容旧目录名称，并支持直接使用完整的 Hugging Face 本地缓存。
 
+### Windows 整合包
+
+- 用户数据以 `SD-Trainer/sd-models`、`output`、`logs`、`train` 为实际目录，整合包根目录保留兼容 junction。
+- 启动时自动迁移旧版反向 junction；整合包移动到新路径后会修复失效 junction，并保留已有数据。
+- 生成 7z 时不再跟随数据目录 junction，避免离线打标模型被重复打包。
+
 ### 文档
 
 - 新增面向 SDXL 用户的 Anima LoRA 参数迁移说明（#193）。

@@ -666,7 +666,13 @@ Normalize-PortableBatchFilesInTree -Root $portableDir
 Write-Host ""
 Write-Host "[5/6] Creating user directories and README..." -ForegroundColor Cyan
 
-foreach ($d in @("sd-models", "output", "logs", "huggingface", "tagger-models", "tagger-models\wd14", "tagger-models\vlm")) {
+foreach ($d in @("sd-models", "output", "logs", "train")) {
+    $p = Join-Path $sdtDir $d
+    New-Item -ItemType Directory -Path $p -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $p ".gitkeep"), "")
+}
+
+foreach ($d in @("huggingface", "tagger-models", "tagger-models\wd14", "tagger-models\vlm")) {
     $p = Join-Path $portableDir $d
     New-Item -ItemType Directory -Path $p -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $p ".gitkeep"), "")
@@ -674,7 +680,7 @@ foreach ($d in @("sd-models", "output", "logs", "huggingface", "tagger-models", 
 
 $linkScript = Join-Path $sdtDir "scripts\portable\link_portable_data_dirs.py"
 if (Test-Path $linkScript) {
-    Write-Host "  Linking sd-models/output/logs/train into SD-Trainer (file picker)..." -ForegroundColor Green
+    Write-Host "  Ensuring SD-Trainer data dirs + portable-root junctions..." -ForegroundColor Green
     & $pythonExe -s $linkScript --trainer-dir $sdtDir
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  WARNING: portable data-dir junction step failed (exit $LASTEXITCODE)" -ForegroundColor Yellow
@@ -697,9 +703,10 @@ $readme += "  run_gui.bat      - Stable entrypoint for portable users`r`n"
 $readme += "  run_gui_portable.bat - Legacy shim (logic in SD-Trainer/scripts/portable/)`r`n"
 $readme += "  python_embeded/  - Python runtime`r`n"
 $readme += "  SD-Trainer/      - Project files`r`n"
-$readme += "  sd-models/       - Put your models here (also linked as SD-Trainer\\sd-models for file picker)`r`n"
-$readme += "  output/          - Training output (linked into SD-Trainer\\output)`r`n"
-$readme += "  logs/            - Logs`r`n`r`n"
+$readme += "  SD-Trainer\\sd-models\\  - Models (file picker; put models here)`r`n"
+$readme += "  SD-Trainer\\output\\    - Training output`r`n"
+$readme += "  SD-Trainer\\logs\\       - Logs`r`n"
+$readme += "  sd-models\\ / output\\ / logs\\ at package root - junctions to SD-Trainer (legacy paths)`r`n"
 $readme += "  tagger-models/   - Local tagger models`r`n`r`n"
 $readme += "Update:`r`n"
 $readme += "  Update-SD-Trainer.bat                - Git update (recommended if .git exists)`r`n"
@@ -738,18 +745,68 @@ if (-not $Skip7z) {
         $archivePath = Join-Path $buildDir $archiveName
         if (Test-Path $archivePath) { Remove-Item $archivePath -Force }
 
-        # 7-Zip follows Windows directory junctions. These paths point back to
-        # portable-root data directories, so archiving them would duplicate
-        # large assets such as the bundled WD14 ONNX model.
-        $archiveExcludes = @(
-            "-xr!SD-Trainer\sd-models",
-            "-xr!SD-Trainer\output",
-            "-xr!SD-Trainer\logs",
-            "-xr!SD-Trainer\train",
-            "-xr!SD-Trainer\tagger-models"
-        )
-        Write-Host "  Compressing..."
-        & $7zExe a -t7z -mx=9 -m0=LZMA2:d=64m -mmt=on $archivePath "$portableDir\*" @archiveExcludes | Out-Null
+        # 7-Zip follows Windows directory junctions and its recursive exclude
+        # patterns also match same-named canonical dirs under SD-Trainer.
+        # Temporarily remove only the portable-root compatibility junctions.
+        $archiveJunctionNames = @("sd-models", "output", "logs", "train")
+        foreach ($name in $archiveJunctionNames) {
+            $canonicalPath = Join-Path $sdtDir $name
+            $unexpected = @(
+                Get-ChildItem -LiteralPath $canonicalPath -Force -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -ne ".gitkeep" }
+            )
+            if ($unexpected.Count -gt 0) {
+                throw "refusing to archive non-empty generated data directory: $canonicalPath (use -Clean)"
+            }
+        }
+        $removedArchiveJunctions = @()
+        $archiveExitCode = 1
+        $restoreExitCode = 0
+        try {
+            foreach ($name in $archiveJunctionNames) {
+                $junctionPath = Join-Path $portableDir $name
+                $item = Get-Item -LiteralPath $junctionPath -Force -ErrorAction SilentlyContinue
+                if (-not $item) {
+                    throw "portable-root data junction missing before archive: $junctionPath"
+                }
+                if (-not ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+                    throw "expected portable-root data junction before archive: $junctionPath"
+                }
+                $removeCommand = 'rmdir "' + $junctionPath + '"'
+                & cmd.exe /d /c $removeCommand | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    throw "failed to remove archive-time junction: $junctionPath"
+                }
+                $removedArchiveJunctions += $name
+            }
+
+            Write-Host "  Compressing..."
+            & $7zExe a -t7z -mx=9 -m0=LZMA2:d=64m -mmt=on $archivePath "$portableDir\*" | Out-Null
+            $archiveExitCode = $LASTEXITCODE
+        } finally {
+            if ($removedArchiveJunctions.Count -gt 0 -and (Test-Path $linkScript)) {
+                & $pythonExe -s $linkScript --trainer-dir $sdtDir | Out-Null
+                $restoreExitCode = $LASTEXITCODE
+                if ($restoreExitCode -eq 0) {
+                    foreach ($name in $removedArchiveJunctions) {
+                        $restoredPath = Join-Path $portableDir $name
+                        $restoredItem = Get-Item -LiteralPath $restoredPath -Force -ErrorAction SilentlyContinue
+                        if (-not $restoredItem -or -not ($restoredItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+                            $restoreExitCode = 1
+                            break
+                        }
+                    }
+                }
+            } elseif ($removedArchiveJunctions.Count -gt 0) {
+                $restoreExitCode = 1
+            }
+        }
+        if ($archiveExitCode -ne 0) {
+            throw "7-Zip archive creation failed (exit $archiveExitCode)"
+        }
+        if ($restoreExitCode -ne 0) {
+            throw "failed to restore portable-root data junctions after archive"
+        }
 
         $sizeBytes = (Get-Item $archivePath).Length
         $sizeMB = [math]::Round($sizeBytes / 1MB, 1)
