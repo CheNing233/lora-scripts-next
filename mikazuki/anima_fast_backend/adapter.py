@@ -152,7 +152,7 @@ def resolution_pair(value: Any, default: int = 1024) -> list[int]:
 
 
 def normalize_bucket_resolution(values: dict[str, Any], warnings: list[str]) -> None:
-    if not truthy(values.get("enable_bucket", True)) or truthy(values.get("bucket_no_upscale")):
+    if not truthy(values.get("enable_bucket", True)):
         return
 
     width, height = resolution_pair(values.get("resolution"))
