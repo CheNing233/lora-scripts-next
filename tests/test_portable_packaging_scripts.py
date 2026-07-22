@@ -84,6 +84,8 @@ def test_portable_archive_temporarily_removes_root_data_junctions():
     assert "rmdir" in script
     assert "ReparsePoint" in script
     assert "$pythonExe -s $linkScript --trainer-dir $sdtDir" in script
+    assert "refusing to archive non-empty generated data directory" in script
+    assert 'Where-Object { $_.Name -ne ".gitkeep" }' in script
     assert "-xr!" not in script
 
 

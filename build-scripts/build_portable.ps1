@@ -749,6 +749,16 @@ if (-not $Skip7z) {
         # patterns also match same-named canonical dirs under SD-Trainer.
         # Temporarily remove only the portable-root compatibility junctions.
         $archiveJunctionNames = @("sd-models", "output", "logs", "train")
+        foreach ($name in $archiveJunctionNames) {
+            $canonicalPath = Join-Path $sdtDir $name
+            $unexpected = @(
+                Get-ChildItem -LiteralPath $canonicalPath -Force -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -ne ".gitkeep" }
+            )
+            if ($unexpected.Count -gt 0) {
+                throw "refusing to archive non-empty generated data directory: $canonicalPath (use -Clean)"
+            }
+        }
         $removedArchiveJunctions = @()
         $archiveExitCode = 1
         $restoreExitCode = 0
