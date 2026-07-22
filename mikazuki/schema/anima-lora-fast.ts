@@ -33,6 +33,10 @@ Schema.intersect([
         caption_extension: Schema.string().default(".txt").description("caption 后缀"),
         resolution: Schema.string().default("1024,1024").description("训练图片分辨率"),
         enable_bucket: Schema.boolean().default(true).description("启用 arb 桶"),
+        min_bucket_reso: Schema.number().min(64).step(64).default(256).description("arb 桶最小分辨率"),
+        max_bucket_reso: Schema.number().min(64).step(64).description("arb 桶最大分辨率；留空时按训练分辨率自动设置，也可以手动填写更大的值"),
+        bucket_reso_steps: Schema.number().min(1).step(1).default(64).description("arb 桶分辨率划分单位"),
+        bucket_no_upscale: Schema.boolean().default(false).description("不放大较小图片；开启后 min/max bucket 限制由训练器忽略"),
     }).description("数据集设置"),
 
     SHARED_SCHEMAS.SAVE_SETTINGS,
