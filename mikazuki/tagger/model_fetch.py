@@ -64,6 +64,10 @@ def describe_interrogator_asset_status(
     files = _asset_filenames(interrogator)
     local_dir = local_model_dir(model_key)
     missing = [name for name in files if not _file_cached(kwargs, name)]
+    if files and not missing:
+        return True, (
+            f"[tagger] 模型 {model_key} 已在 Hugging Face 本地缓存: {repo_id}"
+        )
     file_hint = ", ".join(missing or files)
     return False, (
         f"[tagger] 模型 {model_key} 未在本地\n"
