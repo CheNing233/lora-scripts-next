@@ -89,6 +89,32 @@ def test_migrate_outer_real_folder_into_trainer(tmp_path: Path):
 
 
 @pytest.mark.skipif(os.name != "nt", reason="junctions are Windows-only")
+def test_migrate_merges_nonempty_dirs_and_preserves_name_conflicts(tmp_path: Path):
+    portable_root = tmp_path / "PortableRoot"
+    trainer = portable_root / "SD-Trainer"
+    trainer.mkdir(parents=True)
+    (trainer / "gui.py").write_text("# test\n", encoding="utf-8")
+    (portable_root / "python_embeded").mkdir()
+    inner = trainer / "output"
+    inner.mkdir()
+    (inner / "same.safetensors").write_text("inner", encoding="utf-8")
+    (inner / "inner-only.safetensors").write_text("inner", encoding="utf-8")
+    outer = portable_root / "output"
+    outer.mkdir()
+    (outer / "same.safetensors").write_text("outer", encoding="utf-8")
+    (outer / "outer-only.safetensors").write_text("outer", encoding="utf-8")
+
+    result = ensure_portable_data_dir(trainer, portable_root, "output", log=lambda *_: None)
+
+    assert result == "migrated-outer-to-inner"
+    assert (inner / "same.safetensors").read_text(encoding="utf-8") == "inner"
+    assert (inner / "same.safetensors.portable-root").read_text(encoding="utf-8") == "outer"
+    assert (inner / "inner-only.safetensors").is_file()
+    assert (inner / "outer-only.safetensors").is_file()
+    assert _is_junction(portable_root / "output")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="junctions are Windows-only")
 def test_migrate_legacy_layout_after_portable_root_moves(tmp_path: Path):
     old_root = tmp_path / "OldRoot"
     trainer = old_root / "SD-Trainer"

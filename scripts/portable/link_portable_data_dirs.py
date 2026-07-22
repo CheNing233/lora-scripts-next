@@ -90,6 +90,23 @@ def _path_or_reparse_exists(path: Path) -> bool:
     return path.exists() or _is_reparse_point(path)
 
 
+def _conflict_destination(path: Path) -> Path:
+    candidate = path.with_name(f"{path.name}.portable-root")
+    index = 2
+    while _path_or_reparse_exists(candidate):
+        candidate = path.with_name(f"{path.name}.portable-root-{index}")
+        index += 1
+    return candidate
+
+
+def _move_entries_preserving_conflicts(source: Path, destination: Path) -> None:
+    for item in source.iterdir():
+        target = destination / item.name
+        if _path_or_reparse_exists(target):
+            target = _conflict_destination(target)
+        shutil.move(str(item), str(target))
+
+
 def ensure_portable_data_dir(
     trainer_dir: Path,
     portable_root: Path,
@@ -137,16 +154,11 @@ def ensure_portable_data_dir(
 
     inner.mkdir(parents=True, exist_ok=True)
 
-    # --- Outer real folder with data, inner empty: move into SD-Trainer ---
+    # --- Outer real folder with data: merge into SD-Trainer without overwriting ---
     if outer.exists() and not _is_reparse_point(outer):
         outer_entries = _dir_entries(outer)
-        inner_entries = _dir_entries(inner)
-        if outer_entries and not inner_entries:
-            for item in outer.iterdir():
-                dest = inner / item.name
-                if dest.exists():
-                    raise OSError(f"cannot migrate {name}: {dest} already exists")
-                shutil.move(str(item), str(dest))
+        if outer_entries:
+            _move_entries_preserving_conflicts(outer, inner)
             shutil.rmtree(outer)
             _create_junction(outer, inner)
             log(f"[portable] migrated {name}: moved portable-root data into SD-Trainer")

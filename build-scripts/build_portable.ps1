@@ -745,17 +745,58 @@ if (-not $Skip7z) {
         $archivePath = Join-Path $buildDir $archiveName
         if (Test-Path $archivePath) { Remove-Item $archivePath -Force }
 
-        # 7-Zip follows Windows directory junctions. These portable-root paths
-        # point to the canonical directories under SD-Trainer, so archive only
-        # the canonical copy. The launcher recreates root junctions after extract.
-        $archiveExcludes = @(
-            "-xr!sd-models",
-            "-xr!output",
-            "-xr!logs",
-            "-xr!train"
-        )
-        Write-Host "  Compressing..."
-        & $7zExe a -t7z -mx=9 -m0=LZMA2:d=64m -mmt=on $archivePath "$portableDir\*" @archiveExcludes | Out-Null
+        # 7-Zip follows Windows directory junctions and its recursive exclude
+        # patterns also match same-named canonical dirs under SD-Trainer.
+        # Temporarily remove only the portable-root compatibility junctions.
+        $archiveJunctionNames = @("sd-models", "output", "logs", "train")
+        $removedArchiveJunctions = @()
+        $archiveExitCode = 1
+        $restoreExitCode = 0
+        try {
+            foreach ($name in $archiveJunctionNames) {
+                $junctionPath = Join-Path $portableDir $name
+                $item = Get-Item -LiteralPath $junctionPath -Force -ErrorAction SilentlyContinue
+                if (-not $item) {
+                    throw "portable-root data junction missing before archive: $junctionPath"
+                }
+                if (-not ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+                    throw "expected portable-root data junction before archive: $junctionPath"
+                }
+                $removeCommand = 'rmdir "' + $junctionPath + '"'
+                & cmd.exe /d /c $removeCommand | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    throw "failed to remove archive-time junction: $junctionPath"
+                }
+                $removedArchiveJunctions += $name
+            }
+
+            Write-Host "  Compressing..."
+            & $7zExe a -t7z -mx=9 -m0=LZMA2:d=64m -mmt=on $archivePath "$portableDir\*" | Out-Null
+            $archiveExitCode = $LASTEXITCODE
+        } finally {
+            if ($removedArchiveJunctions.Count -gt 0 -and (Test-Path $linkScript)) {
+                & $pythonExe -s $linkScript --trainer-dir $sdtDir | Out-Null
+                $restoreExitCode = $LASTEXITCODE
+                if ($restoreExitCode -eq 0) {
+                    foreach ($name in $removedArchiveJunctions) {
+                        $restoredPath = Join-Path $portableDir $name
+                        $restoredItem = Get-Item -LiteralPath $restoredPath -Force -ErrorAction SilentlyContinue
+                        if (-not $restoredItem -or -not ($restoredItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+                            $restoreExitCode = 1
+                            break
+                        }
+                    }
+                }
+            } elseif ($removedArchiveJunctions.Count -gt 0) {
+                $restoreExitCode = 1
+            }
+        }
+        if ($archiveExitCode -ne 0) {
+            throw "7-Zip archive creation failed (exit $archiveExitCode)"
+        }
+        if ($restoreExitCode -ne 0) {
+            throw "failed to restore portable-root data junctions after archive"
+        }
 
         $sizeBytes = (Get-Item $archivePath).Length
         $sizeMB = [math]::Round($sizeBytes / 1MB, 1)

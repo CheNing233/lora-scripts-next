@@ -73,14 +73,18 @@ def test_portable_builder_bundles_visible_tagger_models_directory():
     assert "MIKAZUKI_TAGGER_MODELS_DIR" in launcher
 
 
-def test_portable_archive_excludes_trainer_data_junctions():
+def test_portable_archive_temporarily_removes_root_data_junctions():
     script = (ROOT / "build-scripts" / "build_portable.ps1").read_text(
         encoding="utf-8"
     )
 
     for name in ("sd-models", "output", "logs", "train"):
-        assert f"-xr!{name}" in script
-        assert f"-xr!SD-Trainer\\{name}" not in script
+        assert name in script
+    assert "$archiveJunctionNames" in script
+    assert "rmdir" in script
+    assert "ReparsePoint" in script
+    assert "$pythonExe -s $linkScript --trainer-dir $sdtDir" in script
+    assert "-xr!" not in script
 
 
 def test_portable_builder_bundles_dual_update_scripts():
@@ -95,7 +99,8 @@ def test_portable_builder_bundles_dual_update_scripts():
     assert "update_from_release.bat" in script
     assert "SD-Trainer-v*.7z" in release_ps1 or "SD-Trainer-v" in release_ps1
     assert "extensions" in release_ps1
-    assert "config\\autosave" in release_ps1
+    assert '"/XD", "config", "sd-models", "output", "logs", "train"' in release_ps1
+    assert 'assets\\config.json' in release_ps1
 
 
 def test_release_updater_forces_overwrite_for_same_version_republish():
