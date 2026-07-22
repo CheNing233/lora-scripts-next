@@ -2,61 +2,101 @@
   "use strict";
 
   const LYCO_MODULE_RE = /\bnetwork_module\s*=\s*["']lycoris\.kohya["']/i;
-  const NETWORK_ARGS_RE = /(^[ \t]*network_args\s*=\s*\[)([\s\S]*?)(^[ \t]*\])/gim;
-  const QUOTED_ITEM_RE = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g;
-  const INVALID_ARG_RE = /^[^=\s]+\s*=\s*(?:undefined|null|nan)$/i;
+  const NETWORK_ARGS_START_RE =
+    /^[ \t]*network_args\s*=\s*\[[ \t]*(?:#.*)?$/i;
+  const NETWORK_ARGS_END_RE = /^[ \t]*\][ \t]*(?:#.*)?$/;
+  const INVALID_ARG_LINE_RE =
+    /^[ \t]*["'][^"'=\r\n]+\s*=\s*(?:undefined|null|nan)["'][ \t]*,?[ \t]*$/i;
+  const ANIMA_STANDARD_PATH_RE = /^\/lora\/sd3(?:\.(?:html|md))?\/?$/i;
+
+  function isAnimaStandardPage() {
+    return ANIMA_STANDARD_PATH_RE.test(location.pathname || "");
+  }
 
   function sanitizeLycorisToml(value) {
     if (typeof value !== "string" || !LYCO_MODULE_RE.test(value)) {
       return value;
     }
 
-    return value.replace(NETWORK_ARGS_RE, function (whole, opening, body, closing) {
-      const items = body.match(QUOTED_ITEM_RE);
-      if (!items) {
-        return whole;
+    const newline = value.includes("\r\n") ? "\r\n" : "\n";
+    const lines = value.split(/\r?\n/);
+    const cleaned = [];
+    let inNetworkArgs = false;
+    let changed = false;
+
+    lines.forEach(function (line) {
+      if (!inNetworkArgs) {
+        cleaned.push(line);
+        if (NETWORK_ARGS_START_RE.test(line)) {
+          inNetworkArgs = true;
+        }
+        return;
       }
 
-      const kept = items.filter(function (quoted) {
-        const raw = quoted.slice(1, -1).trim();
-        return !INVALID_ARG_RE.test(raw);
-      });
-      if (kept.length === items.length) {
-        return whole;
-      }
-      if (kept.length === 0) {
-        return opening + closing;
+      if (NETWORK_ARGS_END_RE.test(line)) {
+        inNetworkArgs = false;
+        cleaned.push(line);
+        return;
       }
 
-      const indentMatch = body.match(/\r?\n([ \t]*)["']/);
-      const indent = indentMatch ? indentMatch[1] : "  ";
-      const newline = value.includes("\r\n") ? "\r\n" : "\n";
-      return opening + newline + indent + kept.join("," + newline + indent) + newline + closing;
+      if (INVALID_ARG_LINE_RE.test(line)) {
+        changed = true;
+        return;
+      }
+
+      cleaned.push(line);
     });
+
+    return changed ? cleaned.join(newline) : value;
   }
 
   window.mikazukiSanitizeLycorisTomlText = sanitizeLycorisToml;
+  window.mikazukiAnimaLokrGuardLoaded = true;
 
-  // The vendored layout creates the downloaded TOML with new Blob([text]).
-  // Restrict the override to this page and only transform string parts that
-  // contain a LyCORIS config; every other Blob remains byte-for-byte unchanged.
+  // The vendored layout creates the TOML Blob synchronously in its download
+  // click handler. Wrap Blob only for that event turn, then restore it. Using
+  // the native prototype preserves instanceof checks while the wrapper is live.
   const NativeBlob = window.Blob;
-  if (typeof NativeBlob === "function") {
-    class SanitizedConfigBlob extends NativeBlob {
-      constructor(parts, options) {
-        const safeParts = Array.isArray(parts)
-          ? parts.map(function (part) {
-              return typeof part === "string" ? sanitizeLycorisToml(part) : part;
-            })
-          : parts;
-        super(safeParts, options);
-      }
+  let blobRestoreTimer = null;
+
+  function installDownloadBlobForCurrentClick() {
+    if (typeof NativeBlob !== "function" || window.Blob !== NativeBlob) {
+      return;
     }
-    window.Blob = SanitizedConfigBlob;
+
+    function ScopedConfigBlob(parts, options) {
+      const safeParts = Array.isArray(parts)
+        ? parts.map(function (part) {
+            return typeof part === "string" ? sanitizeLycorisToml(part) : part;
+          })
+        : parts;
+      return new NativeBlob(safeParts, options);
+    }
+
+    Object.setPrototypeOf(ScopedConfigBlob, NativeBlob);
+    ScopedConfigBlob.prototype = NativeBlob.prototype;
+    window.Blob = ScopedConfigBlob;
+
+    clearTimeout(blobRestoreTimer);
+    blobRestoreTimer = setTimeout(function () {
+      if (window.Blob === ScopedConfigBlob) {
+        window.Blob = NativeBlob;
+      }
+    }, 0);
+  }
+
+  function isConfigDownloadButton(target) {
+    const button = target && target.closest ? target.closest("button") : null;
+    if (!button || !button.closest(".right-container")) {
+      return false;
+    }
+    const text = (button.textContent || "").replace(/\s+/g, " ").trim();
+    return text === "下载配置文件" || /^download config$/i.test(text);
   }
 
   function sanitizePreviewTextNode(node) {
     if (
+      !isAnimaStandardPage() ||
       node.nodeType !== Node.TEXT_NODE ||
       !node.parentElement ||
       !node.parentElement.closest(".params-section")
@@ -84,13 +124,24 @@
     }
   }
 
-  function installPreviewGuard() {
-    const preview = document.querySelector(".params-section");
-    if (!preview) {
-      return false;
+  function sanitizeCurrentPreview() {
+    if (!isAnimaStandardPage()) {
+      return;
     }
+    const preview = document.querySelector(".params-section");
     sanitizePreviewTree(preview);
+  }
+
+  function installPreviewGuard() {
+    sanitizeCurrentPreview();
+    const root = document.querySelector("#app");
+    if (!root) {
+      return;
+    }
     new MutationObserver(function (mutations) {
+      if (!isAnimaStandardPage()) {
+        return;
+      }
       mutations.forEach(function (mutation) {
         if (mutation.type === "characterData") {
           sanitizePreviewTextNode(mutation.target);
@@ -98,17 +149,32 @@
         }
         mutation.addedNodes.forEach(sanitizePreviewTree);
       });
-    }).observe(preview, {
+    }).observe(root, {
       childList: true,
       characterData: true,
       subtree: true,
     });
-    return true;
   }
+
+  document.addEventListener(
+    "click",
+    function (event) {
+      if (isAnimaStandardPage() && isConfigDownloadButton(event.target)) {
+        installDownloadBlobForCurrentClick();
+      }
+    },
+    true
+  );
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", installPreviewGuard, { once: true });
   } else {
     installPreviewGuard();
   }
+  window.addEventListener("popstate", function () {
+    setTimeout(sanitizeCurrentPreview, 0);
+  });
+  window.addEventListener("hashchange", function () {
+    setTimeout(sanitizeCurrentPreview, 0);
+  });
 })();

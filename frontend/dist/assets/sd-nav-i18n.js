@@ -155,6 +155,8 @@
   const TERMINAL_MENU_PATH = "/task.html";
   const TERMINAL_PANEL_ID = "sd-terminal-panel";
   const TERMINAL_STYLE_ID = "sd-terminal-style";
+  const ANIMA_LOKR_GUARD_ID = "sd-anima-lokr-config-guard";
+  const ANIMA_LOKR_GUARD_PATH = "/assets/anima-lokr-config-guard.js?v=20260722-issue186";
 
   let terminalPollTimer = null;
   let terminalInstallEs = null;
@@ -252,6 +254,16 @@
 
   function isTerminalPage() {
     return /^\/task(\.html|\.md)?$/i.test(location.pathname || "");
+  }
+
+  function ensureAnimaLokrConfigGuard() {
+    if (!/^\/lora\/sd3(?:\.(?:html|md))?\/?$/i.test(location.pathname || "")) return;
+    if (window.mikazukiAnimaLokrGuardLoaded) return;
+    if (document.getElementById(ANIMA_LOKR_GUARD_ID)) return;
+    const script = document.createElement("script");
+    script.id = ANIMA_LOKR_GUARD_ID;
+    script.src = ANIMA_LOKR_GUARD_PATH;
+    document.head.appendChild(script);
   }
 
   function closeTerminalStreams() {
@@ -940,6 +952,7 @@
     if (scheduled) clearTimeout(scheduled);
     scheduled = setTimeout(() => {
       scheduled = null;
+      ensureAnimaLokrConfigGuard();
       applyNavLocale();
       hookLanguageToggle();
       ensureTerminalPanel();
@@ -948,6 +961,7 @@
 
   function boot() {
     migrateLegacyLocale();
+    ensureAnimaLokrConfigGuard();
     applyNavLocale();
     hookLanguageToggle();
     ensureTerminalPanel();
