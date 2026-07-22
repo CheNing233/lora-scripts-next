@@ -63,7 +63,7 @@ cd /d "%PORTABLE_ROOT%SD-Trainer"
 if errorlevel 1 goto :no_project
 
 if exist "scripts\portable\link_portable_data_dirs.py" (
-    echo [portable] Linking sd-models/output/train into SD-Trainer for file picker >> "%LOG_FILE%"
+    echo [portable] Ensuring SD-Trainer data dirs for file picker >> "%LOG_FILE%"
     "%PYTHON_EXE%" -s scripts\portable\link_portable_data_dirs.py >> "%LOG_FILE%" 2>&1
 )
 

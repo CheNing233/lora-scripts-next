@@ -78,8 +78,9 @@ def test_portable_archive_excludes_trainer_data_junctions():
         encoding="utf-8"
     )
 
-    for name in ("sd-models", "output", "logs", "train", "tagger-models"):
-        assert f"-xr!SD-Trainer\\{name}" in script
+    for name in ("sd-models", "output", "logs", "train"):
+        assert f"-xr!{name}" in script
+        assert f"-xr!SD-Trainer\\{name}" not in script
 
 
 def test_portable_builder_bundles_dual_update_scripts():
