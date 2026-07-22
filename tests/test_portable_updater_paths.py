@@ -46,6 +46,16 @@ def test_portable_updater_ps1_files_have_utf8_bom() -> None:
         assert data.startswith(b"\xef\xbb\xbf"), f"{name} must start with UTF-8 BOM for PS 5.1"
 
 
+def test_release_updater_uses_github_token_when_available() -> None:
+    script = (
+        REPO_ROOT / "scripts" / "portable" / "update_from_release.ps1"
+    ).read_text(encoding="utf-8-sig")
+
+    assert "$env:GITHUB_TOKEN" in script
+    assert "$env:GH_TOKEN" in script
+    assert '$headers["Authorization"] = "Bearer $githubToken"' in script
+
+
 def test_normalize_strips_trailing_backslash_and_stray_quote() -> None:
     root = r"D:\pkg\SD-Trainer-v2.8.3"
     assert _run_normalize(root + "\\") == root

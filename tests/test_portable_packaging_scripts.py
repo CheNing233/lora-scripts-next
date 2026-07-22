@@ -116,6 +116,16 @@ def test_release_updater_forces_overwrite_for_same_version_republish():
     assert "PORTABLE_BUILD" in release_ps1
 
 
+def test_portable_verifier_checks_current_user_data_exclusions():
+    verifier = (
+        ROOT / "scripts" / "portable" / "verify_portable_updaters.ps1"
+    ).read_text(encoding="utf-8-sig")
+
+    assert '"/XD", "config"' in verifier
+    assert "assets\\config.json" in verifier
+    assert "missingUserDataMarkers" in verifier
+
+
 def test_portable_builder_writes_portable_build_metadata():
     script = (ROOT / "build-scripts" / "build_portable.ps1").read_text(
         encoding="utf-8"

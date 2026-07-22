@@ -63,10 +63,22 @@ if (Test-Path $ps1) {
     if ($content -notmatch "SD-Trainer-v") {
         $failures += "[FAIL] update_from_release.ps1 missing asset filter"
     }
-    if ($content -match "extensions" -and $content -match "autosave") {
+    $requiredUserDataMarkers = @(
+        "extensions",
+        '"/XD", "config"',
+        "sd-models",
+        "output",
+        "logs",
+        "train",
+        "assets\config.json"
+    )
+    $missingUserDataMarkers = @(
+        $requiredUserDataMarkers | Where-Object { -not $content.Contains($_) }
+    )
+    if ($missingUserDataMarkers.Count -eq 0) {
         Write-Host '[OK] update_from_release.ps1 user-data exclusions'
     } else {
-        $failures += "[FAIL] update_from_release.ps1 missing user-data exclusions"
+        $failures += "[FAIL] update_from_release.ps1 missing user-data exclusions: $($missingUserDataMarkers -join ', ')"
     }
     if ($content -match '/XO') {
         $failures += "[FAIL] update_from_release.ps1 must not use /XO (breaks same-version republish)"
