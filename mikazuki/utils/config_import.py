@@ -10,6 +10,7 @@ from typing import Any
 from mikazuki.utils.train_utils import ensure_enable_preview_flag
 
 ANIMA_TRAIN_TYPES = frozenset({"anima-lora", "sd3-lora"})
+ANIMA_FAST_TRAIN_TYPES = frozenset({"anima-lora-fast"})
 FLUX_TRAIN_TYPES = frozenset({"flux-lora", "flux-finetune"})
 LUMINA_TRAIN_TYPES = frozenset({"lumina-lora"})
 SDXL_TRAIN_TYPES = frozenset({"sdxl-lora", "sdxl-finetune"})
@@ -27,6 +28,18 @@ ANIMA_CONFIG_MARKERS = frozenset({
     "vae_chunk_size",
     "vae_disable_cache",
     "unsloth_offload_checkpointing",
+})
+
+ANIMA_FAST_CONFIG_MARKERS = frozenset({
+    "method",
+    "methods_subdir",
+    "static_token_count",
+    "compile_mode",
+    "source_image_dir",
+    "resized_image_dir",
+    "lora_cache_dir",
+    "skip_cache_check",
+    "progress_jsonl",
 })
 
 FLUX_CONFIG_MARKERS = frozenset({
@@ -109,6 +122,18 @@ PAGE_SPECS: dict[str, dict[str, Any]] = {
         "accepted": ANIMA_TRAIN_TYPES,
         "default_train_type": "anima-lora",
     },
+    "anima-fast": {
+        "label": "Anima Fast 训练",
+        "path": "/lora/anima-fast.html",
+        "accepted": ANIMA_FAST_TRAIN_TYPES,
+        "default_train_type": "anima-lora-fast",
+    },
+    "anima-lora-fast": {
+        "label": "Anima Fast 训练",
+        "path": "/lora/anima-fast.html",
+        "accepted": ANIMA_FAST_TRAIN_TYPES,
+        "default_train_type": "anima-lora-fast",
+    },
     "flux-lora": {
         "label": "Flux LoRA 训练",
         "path": "/lora/flux.html",
@@ -150,6 +175,7 @@ PAGE_SPECS: dict[str, dict[str, Any]] = {
 TRAIN_TYPE_TARGETS: dict[str, dict[str, str]] = {
     "anima-lora": {"path": "/lora/sd3.html", "label": "Anima LoRA 训练"},
     "sd3-lora": {"path": "/lora/sd3.html", "label": "Anima LoRA 训练"},
+    "anima-lora-fast": {"path": "/lora/anima-fast.html", "label": "Anima Fast 训练"},
     "flux-lora": {"path": "/lora/flux.html", "label": "Flux LoRA 训练"},
     "flux-finetune": {"path": "/lora/flux.html", "label": "Flux 训练"},
     "lumina-lora": {"path": "/lora/lumina.html", "label": "Lumina LoRA 训练"},
@@ -261,6 +287,14 @@ def analyze_train_type(config: dict) -> TrainTypeAnalysis:
     """Score config content across training families and return the best match."""
     families: list[tuple[str, int, list[str]]] = []
 
+    anima_fast_score, anima_fast_reasons = _score_family(
+        config,
+        marker_keys=ANIMA_FAST_CONFIG_MARKERS,
+        path_rules=(),
+        marker_weight=6,
+    )
+    families.append(("anima-lora-fast", anima_fast_score, anima_fast_reasons))
+
     anima_score, anima_reasons = _score_family(
         config,
         marker_keys=ANIMA_CONFIG_MARKERS,
@@ -320,6 +354,8 @@ def _family_of(train_type: str | None) -> str | None:
         return None
     if train_type in ANIMA_TRAIN_TYPES:
         return "anima"
+    if train_type in ANIMA_FAST_TRAIN_TYPES:
+        return "anima-fast"
     if train_type in FLUX_TRAIN_TYPES:
         return "flux"
     if train_type in LUMINA_TRAIN_TYPES:
