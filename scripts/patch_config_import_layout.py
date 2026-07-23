@@ -33,7 +33,7 @@ HELPER = (
     "const cfg=data.config||k;"
     "let U=findChangedDataBySchema(clone(cfg),schemaFn);"
     "if(data.forced_train_type)U.model_train_type=data.forced_train_type;"
-    "if(fullReplace){let applied=Object.assign({},schemaFn(),U);if(data.forced_train_type)applied.model_train_type=data.forced_train_type;a.value=applied}else merge?a.value==null?a.value=clone(U):a.value=Object.assign({},a.value,U):a.value=U;"
+    "if(fullReplace){let defaults=schemaFn()||{},applied=Object.assign({},defaults);for(const key in cfg)defaults.hasOwnProperty(key)||(applied[key]=cfg[key]);Object.assign(applied,U);if(data.forced_train_type)applied.model_train_type=data.forced_train_type;a.value=applied}else merge?a.value==null?a.value=clone(U):a.value=Object.assign({},a.value,U):a.value=U;"
     "if(data.notice)ElMessage.info({message:data.notice,duration:8e3});"
     'if(successMsg)ElMessage.success(successMsg);else if(data.message&&data.result==="ok")ElMessage.success(data.message);'
     "return!0}"
@@ -128,9 +128,9 @@ UPGRADE_REPLACEMENTS: list[tuple[str, str, str]] = [
         "let U=findChangedDataBySchema(clone(cfg),schemaFn);",
     ),
     (
-        "config import full replace uses normalized values",
-        "if(fullReplace){let applied=Object.assign({},schemaFn(),cfg);",
+        "config import full replace keeps validated fields during schema warmup",
         "if(fullReplace){let applied=Object.assign({},schemaFn(),U);",
+        "if(fullReplace){let defaults=schemaFn()||{},applied=Object.assign({},defaults);for(const key in cfg)defaults.hasOwnProperty(key)||(applied[key]=cfg[key]);Object.assign(applied,U);",
     ),
     (
         "file import accept json + full replace",
@@ -231,6 +231,16 @@ PREVIEW_SIGNAL_GUARD_RAW = (
 
 PREVIEW_PATCHES: list[tuple[str, str, str]] = [
     (
+        "checkParams safe optimizer_type DAdapt",
+        'e.optimizer_type.startsWith("DAdapt")',
+        '(e.optimizer_type||"").startsWith("DAdapt")',
+    ),
+    (
+        "checkParams safe optimizer_type prodigy",
+        'e.optimizer_type.startsWith("prodigy")',
+        '(e.optimizer_type||"").startsWith("prodigy")',
+    ),
+    (
         "needDeleteParams drop enable_preview",
         '"enable_block_weights","enable_preview","network_args_custom"',
         '"enable_block_weights","network_args_custom"',
@@ -265,6 +275,34 @@ PREVIEW_PATCHES: list[tuple[str, str, str]] = [
     ),
 ]
 
+SUBMIT_FEEDBACK_PATCHES: list[tuple[str, str, str]] = [
+    (
+        "declare train submit notice handle",
+        "submitLoading=ref(!1),setSubmitButtonLoading=",
+        "submitLoading=ref(!1),submitNotice=null,setSubmitButtonLoading=",
+    ),
+    (
+        "persistent train submit notice",
+        'ElMessage.info({message:"正在提交训练任务...",duration:2e3});try{',
+        'submitNotice=ElMessage({message:"任务正在提交中，请稍等",duration:0,type:"info"});try{',
+    ),
+    (
+        "train started notice",
+        'g.status=="success"?ElMessage.success("\\u8BAD\\u7EC3\\u4EFB\\u52A1\\u5DF2\\u63D0\\u4EA4\\u6210\\u529F\\uFF1A"+g.message):ElMessage.error("\\u8BAD\\u7EC3\\u4EFB\\u52A1\\u63D0\\u4EA4\\u5931\\u8D25\\uFF1A"+g.message)',
+        'g.status=="success"?(submitNotice.close(),ElMessage.success("训练已开始")):(submitNotice.close(),ElMessage.error("\\u8BAD\\u7EC3\\u4EFB\\u52A1\\u63D0\\u4EA4\\u5931\\u8D25\\uFF1A"+g.message))',
+    ),
+    (
+        "train submit error closes notice",
+        '}catch(m){ElMessage.error(v("networkError")),console.error("There was a problem with the fetch operation:",m)}',
+        '}catch(m){submitNotice.close(),ElMessage.error(v("networkError")),console.error("There was a problem with the fetch operation:",m)}',
+    ),
+    (
+        "train submit finally closes notice",
+        '}finally{submitLoading.value=!1,setSubmitButtonLoading(!1)}',
+        '}finally{submitNotice.close(),submitLoading.value=!1,setSubmitButtonLoading(!1)}',
+    ),
+]
+
 
 def _replace_once(text: str, label: str, old: str, new: str) -> str:
     if old not in text:
@@ -276,6 +314,12 @@ def _replace_once(text: str, label: str, old: str, new: str) -> str:
 
 def main() -> None:
     text = LAYOUT.read_text(encoding="utf-8")
+    # Repair the short-lived invalid v2.9.0 patch before applying idempotent rules.
+    text = text.replace(
+        "const submitNotice=ElMessage(",
+        "submitNotice=ElMessage(",
+        1,
+    )
     already = HELPER_MARKER in text
 
     if not already:
@@ -286,6 +330,9 @@ def main() -> None:
             text = _replace_once(text, label, old, new)
 
     for label, old, new in PREVIEW_PATCHES:
+        text = _replace_once(text, label, old, new)
+
+    for label, old, new in SUBMIT_FEEDBACK_PATCHES:
         text = _replace_once(text, label, old, new)
 
     LAYOUT.write_text(text, encoding="utf-8")
