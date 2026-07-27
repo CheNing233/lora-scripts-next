@@ -277,14 +277,14 @@ PREVIEW_PATCHES: list[tuple[str, str, str]] = [
 
 SUBMIT_FEEDBACK_PATCHES: list[tuple[str, str, str]] = [
     (
-        "declare train submit notice handle",
-        "submitLoading=ref(!1),setSubmitButtonLoading=",
+        "remove shared const train submit notice handle",
         "submitLoading=ref(!1),submitNotice=null,setSubmitButtonLoading=",
+        "submitLoading=ref(!1),setSubmitButtonLoading=",
     ),
     (
-        "persistent train submit notice",
-        'ElMessage.info({message:"正在提交训练任务...",duration:2e3});try{',
-        'submitNotice=ElMessage({message:"任务正在提交中，请稍等",duration:0,type:"info"});try{',
+        "use function-local train submit notice handle",
+        'submitLoading.value=!0,setSubmitButtonLoading(!0),submitNotice=ElMessage({message:"任务正在提交中，请稍等",duration:0,type:"info"});try{',
+        'submitLoading.value=!0,setSubmitButtonLoading(!0);const submitNotice=ElMessage({message:"任务正在提交中，请稍等",duration:0,type:"info"});try{',
     ),
     (
         "train started notice",
@@ -314,10 +314,19 @@ def _replace_once(text: str, label: str, old: str, new: str) -> str:
 
 def main() -> None:
     text = LAYOUT.read_text(encoding="utf-8")
-    # Repair the short-lived invalid v2.9.0 patch before applying idempotent rules.
+    # Normalize the pre-v2.9.0 short notice before applying the fixed persistent
+    # notice rule. The complete anchor includes the preceding comma expression,
+    # so the local const starts a valid statement instead of joining that chain.
     text = text.replace(
-        "const submitNotice=ElMessage(",
-        "submitNotice=ElMessage(",
+        'submitLoading.value=!0,setSubmitButtonLoading(!0),ElMessage.info({message:"正在提交训练任务...",duration:2e3});try{',
+        'submitLoading.value=!0,setSubmitButtonLoading(!0),submitNotice=ElMessage({message:"任务正在提交中，请稍等",duration:0,type:"info"});try{',
+        1,
+    )
+    # Normalize the short-lived invalid syntax variant without touching the
+    # correct function-local `;const submitNotice` form.
+    text = text.replace(
+        ",const submitNotice=ElMessage(",
+        ",submitNotice=ElMessage(",
         1,
     )
     already = HELPER_MARKER in text

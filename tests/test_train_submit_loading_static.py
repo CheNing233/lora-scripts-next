@@ -1,3 +1,4 @@
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -14,12 +15,11 @@ class TrainSubmitLoadingStaticTests(unittest.TestCase):
         self.assertIn("setSubmitButtonLoading=", layout)
         self.assertIn("trainSubmitButton", layout)
         self.assertIn("if(submitLoading.value)return", layout)
-        self.assertIn("submitLoading=ref(!1),submitNotice=null", layout)
+        self.assertNotIn("submitLoading=ref(!1),submitNotice=null", layout)
         self.assertIn(
-            "submitLoading.value=!0,setSubmitButtonLoading(!0),submitNotice=ElMessage(",
+            "submitLoading.value=!0,setSubmitButtonLoading(!0);const submitNotice=ElMessage(",
             layout,
         )
-        self.assertNotIn("const submitNotice=ElMessage(", layout)
         self.assertIn("任务正在提交中，请稍等", layout)
         self.assertIn('duration:0,type:"info"', layout)
         self.assertIn("submitNotice.close()", layout)
@@ -30,6 +30,39 @@ class TrainSubmitLoadingStaticTests(unittest.TestCase):
         self.assertIn("finally{submitNotice.close(),submitLoading.value=!1", layout)
         self.assertIn("loading:submitLoading.value", layout)
         self.assertIn("disabled:submitLoading.value", layout)
+
+    def test_submit_notice_statement_executes_without_const_reassignment(self):
+        layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
+            encoding="utf-8"
+        )
+        start = layout.index("submitLoading.value=!0")
+        end = layout.index(";try{", start) + 1
+        statement = layout[start:end]
+        setup_start = layout.index("setup(e){let t=null;const ")
+        setup_end = layout.index(",setSubmitButtonLoading=", setup_start)
+        setup_declaration = layout[setup_start:setup_end]
+        inherited_notice = (
+            "const submitNotice=null;" if "submitNotice=null" in setup_declaration else ""
+        )
+        script = (
+            '"use strict";'
+            f"{inherited_notice}"
+            "const submitLoading={value:false};"
+            "const setSubmitButtonLoading=()=>{};"
+            "const ElMessage=()=>({close(){}});"
+            f"async function submit(){{{statement}return submitNotice;}}"
+            'submit().then(()=>process.stdout.write("ok"));'
+        )
+
+        result = subprocess.run(
+            ["node", "-e", script],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "ok")
 
     def test_imported_string_learning_rates_are_normalized_before_exponential_formatting(self):
         layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
