@@ -33,9 +33,10 @@ class AnimaLokrConfigGuardStaticTests(unittest.TestCase):
             if "sd-nav-i18n.js" in path.read_text(encoding="utf-8")
         ]
         self.assertTrue(pages)
+        version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
         for page in pages:
             self.assertIn(
-                "sd-nav-i18n.js?v=2.8.35-issue186",
+                f"sd-nav-i18n.js?v={version}",
                 page.read_text(encoding="utf-8"),
                 page,
             )
