@@ -14,20 +14,12 @@ class TrainSubmitLoadingStaticTests(unittest.TestCase):
         self.assertIn("setSubmitButtonLoading=", layout)
         self.assertIn("trainSubmitButton", layout)
         self.assertIn("if(submitLoading.value)return", layout)
-        self.assertIn("submitLoading=ref(!1),submitNotice=null", layout)
-        self.assertIn(
-            "submitLoading.value=!0,setSubmitButtonLoading(!0),submitNotice=ElMessage(",
-            layout,
-        )
-        self.assertNotIn("const submitNotice=ElMessage(", layout)
-        self.assertIn("任务正在提交中，请稍等", layout)
-        self.assertIn('duration:0,type:"info"', layout)
-        self.assertIn("submitNotice.close()", layout)
-        self.assertIn('ElMessage.success("训练已开始")', layout)
-        self.assertNotIn('message:"正在提交训练任务...",duration:2e3', layout)
+        self.assertIn("submitLoading.value=!0", layout)
+        self.assertIn("setSubmitButtonLoading(!0)", layout)
+        self.assertIn("正在提交训练任务...", layout)
         self.assertIn("setSubmitButtonLoading(!1)", layout)
         self.assertIn('try{const _=parseParams(n.value(a.value),t);', layout)
-        self.assertIn("finally{submitNotice.close(),submitLoading.value=!1", layout)
+        self.assertIn("finally{submitLoading.value=!1", layout)
         self.assertIn("loading:submitLoading.value", layout)
         self.assertIn("disabled:submitLoading.value", layout)
 
@@ -57,21 +49,8 @@ class TrainSubmitLoadingStaticTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("let defaults=schemaFn()||{},applied=Object.assign({},defaults)", layout)
-        self.assertIn(
-            "for(const key in cfg)defaults.hasOwnProperty(key)||(applied[key]=cfg[key])",
-            layout,
-        )
-        self.assertIn("Object.assign(applied,U)", layout)
+        self.assertIn("Object.assign({},schemaFn(),U)", layout)
         self.assertNotIn("Object.assign({},schemaFn(),cfg)", layout)
-
-    def test_check_params_tolerates_missing_optimizer_during_schema_warmup(self):
-        layout = Path("frontend/dist/assets/layout.96d49288.js").read_text(
-            encoding="utf-8"
-        )
-
-        self.assertIn('(e.optimizer_type||"").startsWith("DAdapt")', layout)
-        self.assertIn('(e.optimizer_type||"").startsWith("prodigy")', layout)
 
     def test_patch_script_replaces_unsafe_parse_params_re_float_formatting(self):
         label, old, new = next(

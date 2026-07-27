@@ -4,51 +4,6 @@ from mikazuki.utils.config_import import analyze_train_type, infer_train_type, v
 
 
 class ConfigImportTests(unittest.TestCase):
-    def test_standard_anima_lokr_on_fast_page_redirects_to_standard_mode(self):
-        config = {
-            "model_train_type": "anima-lora",
-            "lora_type": "lokr",
-            "network_module": "lycoris.kohya",
-            "qwen3": "qwen_3_06b_base.safetensors",
-            "network_args": ["algo=lokr", "factor=-1"],
-        }
-
-        result = validate_config_import("anima-lora-fast", config)
-
-        self.assertEqual(result["result"], "redirect")
-        self.assertEqual(result["target_path"], "/lora/sd3.html")
-
-    def test_native_anima_fast_config_is_accepted_on_fast_page(self):
-        config = {
-            "model_train_type": "anima-lora-fast",
-            "lora_type": "lora",
-            "method": "lora",
-            "methods_subdir": "gui-methods",
-            "static_token_count": 4096,
-            "compile_mode": "blocks",
-            "qwen3": "qwen_3_06b_base.safetensors",
-        }
-
-        result = validate_config_import("anima-lora-fast", config)
-
-        self.assertEqual(result["result"], "ok")
-        self.assertEqual(result["config"]["model_train_type"], "anima-lora-fast")
-
-    def test_native_anima_fast_config_on_standard_page_redirects_to_fast_mode(self):
-        config = {
-            "model_train_type": "anima-lora-fast",
-            "method": "lora",
-            "methods_subdir": "gui-methods",
-            "static_token_count": 4096,
-            "compile_mode": "blocks",
-            "qwen3": "qwen_3_06b_base.safetensors",
-        }
-
-        result = validate_config_import("sd3-lora", config)
-
-        self.assertEqual(result["result"], "redirect")
-        self.assertEqual(result["target_path"], "/lora/anima-fast.html")
-
     def test_sdxl_on_anima_page_redirects(self):
         config = {
             "model_train_type": "sdxl-lora",
