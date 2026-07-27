@@ -5,6 +5,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from scripts.spa_asset_cache import SPA_ASSET_CACHE_KEY
+
 
 class AnimaFastStaticIntegrationTests(unittest.TestCase):
     def test_schema_file_exists_and_uses_fast_train_type(self):
@@ -75,7 +77,10 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertIn("anima-lora-fast", data.read_text(encoding="utf-8"))
         component_text = component.read_text(encoding="utf-8")
         self.assertIn("data-anima-fast-install", component_text)
-        self.assertIn('from"./app.547295de.js?v=20260605-routefix2"', component_text)
+        self.assertIn(
+            f'from"./app.547295de.js?v={SPA_ASSET_CACHE_KEY}"',
+            component_text,
+        )
         self.assertNotIn('from"./app.547295de.js";', component_text)
         page_text = page.read_text(encoding="utf-8")
         self.assertIn("sorryhyun/anima_lora", page_text)
@@ -129,7 +134,7 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
         self.assertNotIn("\n  <ul>", source)
         self.assertIn('aria-hidden":"true",style:"display:none"', source)
         self.assertEqual(source.count("`") % 2, 0)
-        self.assertIn('from"./app.547295de.js?v=20260605-routefix2"', source)
+        self.assertIn(f'from"./app.547295de.js?v={SPA_ASSET_CACHE_KEY}"', source)
         self.assertNotIn('from"app.547295de.js?v=', source)
         subprocess.run(["node", "--check", str(guide_js)], check=True)
 
@@ -167,7 +172,7 @@ class AnimaFastStaticIntegrationTests(unittest.TestCase):
 
     def test_frontend_dist_uses_project_version_cache_bust(self):
         version = Path("VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(version, "2.8.35")
+        self.assertEqual(version, "2.9.1")
 
         for path in Path("frontend/dist").rglob("*.html"):
             html = path.read_text(encoding="utf-8")
