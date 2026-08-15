@@ -75,3 +75,5 @@ vendor/anima_lora/
 
 # 训练相关
 __TRAIN__/
+__DOCS__/
+__TOOLS__/
