@@ -477,11 +477,14 @@ def get_noisy_model_input_and_timesteps(
     num_timesteps = noise_scheduler.config.num_train_timesteps
     if sigma_min is not None or sigma_max is not None:
         # Per-subset sigma range (sigma=1 is pure noise, sigma=0 is clean).
-        lo = 0.0 if sigma_min is None else float(sigma_min)
-        hi = 1.0 if sigma_max is None else float(sigma_max)
-        lo = min(max(lo, 0.0), 1.0)
-        hi = min(max(hi, 0.0), 1.0)
+        raw_lo = 0.0 if sigma_min is None else float(sigma_min)
+        raw_hi = 1.0 if sigma_max is None else float(sigma_max)
+        lo = min(max(raw_lo, 0.0), 1.0)
+        hi = min(max(raw_hi, 0.0), 1.0)
+        if lo != raw_lo or hi != raw_hi:
+            logger.warning(f"sigma range [{raw_lo}, {raw_hi}] clamped to [{lo}, {hi}]")
         if hi < lo:
+            logger.warning(f"sigma_min > sigma_max, swapping [{lo}, {hi}] -> [{hi}, {lo}]")
             lo, hi = hi, lo
         sigmas = lo + (hi - lo) * torch.rand((bsz,), device=device)
         timesteps = sigmas * num_timesteps

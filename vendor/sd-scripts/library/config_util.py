@@ -499,6 +499,7 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
 
         subsets = [subset_klass(**asdict(subset_blueprint.params)) for subset_blueprint in dataset_blueprint.subsets]
         _dataset_params = asdict(dataset_blueprint.params)
+        # sigma_min/sigma_max are dataset-level: injected into every subset of this block.
         _sigma_min = _dataset_params.pop("sigma_min", None)
         _sigma_max = _dataset_params.pop("sigma_max", None)
         for _subset in subsets:
@@ -534,6 +535,7 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
 
         subsets = [subset_klass(**asdict(subset_blueprint.params)) for subset_blueprint in dataset_blueprint.subsets]
         _dataset_params = asdict(dataset_blueprint.params)
+        # sigma_min/sigma_max are dataset-level: injected into every subset of this block.
         _sigma_min = _dataset_params.pop("sigma_min", None)
         _sigma_max = _dataset_params.pop("sigma_max", None)
         for _subset in subsets:

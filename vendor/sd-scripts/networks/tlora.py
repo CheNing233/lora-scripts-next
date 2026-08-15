@@ -137,8 +137,8 @@ class TLoRAModule(lora_network.LoRAModule):
         elif timesteps.numel() != batch_size:
             return None, None
 
-        if timesteps.max().item() > 1.0 or timesteps.min().item() < 0.0:
-            timesteps = timesteps / 1000.0
+        # Timesteps are already scaled to [0, 1] by the trainer; clamp defensively
+        # without .item() (which would force a GPU sync on every LoRA module forward).
         timesteps = timesteps.clamp(0.0, 1.0)
 
         progress = 1.0 - timesteps

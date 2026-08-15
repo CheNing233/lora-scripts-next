@@ -220,6 +220,13 @@ class NetworkTrainer:
     def sample_images(self, accelerator, args, epoch, global_step, device, vae, tokenizers, text_encoder, unet):
         train_util.sample_images(accelerator, args, epoch, global_step, device, vae, tokenizers[0], text_encoder, unet)
 
+    def _clear_tlora_timestep(self, accelerator, network):
+        # T-LoRA: clear the training timestep so sampling/validation forwards run at full
+        # rank instead of reusing the last training step's rank mask.
+        unwrapped = accelerator.unwrap_model(network)
+        if hasattr(unwrapped, "clear_current_timestep"):
+            unwrapped.clear_current_timestep()
+
     # region SD/SDXL
 
     def post_process_network(self, args, accelerator, network, text_encoders, unet):
@@ -1329,6 +1336,7 @@ class NetworkTrainer:
 
         # For --sample_at_first
         optimizer_eval_fn()
+        self._clear_tlora_timestep(accelerator, network)
         self.sample_images(accelerator, args, 0, global_step, accelerator.device, vae, tokenizers, text_encoder, unet)
         optimizer_train_fn()
         is_tracking = len(accelerator.trackers) > 0
@@ -1488,6 +1496,7 @@ class NetworkTrainer:
                     global_step += 1
 
                     optimizer_eval_fn()
+                    self._clear_tlora_timestep(accelerator, network)
                     self.sample_images(
                         accelerator, args, None, global_step, accelerator.device, vae, tokenizers, text_encoder, unet
                     )
@@ -1704,6 +1713,7 @@ class NetworkTrainer:
                     if args.save_state:
                         train_util.save_and_remove_state_on_epoch_end(args, accelerator, epoch + 1)
 
+            self._clear_tlora_timestep(accelerator, network)
             self.sample_images(accelerator, args, epoch + 1, global_step, accelerator.device, vae, tokenizers, text_encoder, unet)
             progress_bar.unpause()
             optimizer_train_fn()
