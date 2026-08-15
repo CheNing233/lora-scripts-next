@@ -3,12 +3,12 @@ chcp 65001 >nul 2>&1
 setlocal
 
 REM ========== run ==========
-set "RUN_NAME=agm"
-set "OUTPUT_NAME=agm"
+set "RUN_NAME=doma_ogpt_v1"
+set "OUTPUT_NAME=doma_ogpt_v1"
 
 REM ========== paths ==========
 set "TRAINER_ROOT=%~dp0"
-set "TRAIN_PATH=%TRAINER_ROOT%__TRAINS__\%RUN_NAME%"
+set "TRAIN_PATH=%TRAINER_ROOT%__TRAIN__\%RUN_NAME%"
 
 REM ========== Anima base models (__AI_MODELS__) ==========
 set "MODELS_ROOT=C:\Users\xChenNing\Documents\__AI_MODELS__"
