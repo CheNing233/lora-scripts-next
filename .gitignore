@@ -72,3 +72,6 @@ data/
 
 # Optional vendored anima_lora experiments
 vendor/anima_lora/
+
+# 训练相关
+__TRAIN__/
