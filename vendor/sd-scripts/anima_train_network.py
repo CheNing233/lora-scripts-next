@@ -278,6 +278,15 @@ class AnimaNetworkTrainer(train_network.NetworkTrainer):
         )
         timesteps = timesteps / 1000.0  # scale to [0, 1] range. timesteps is float32
 
+        # T-LoRA: propagate the current timestep into the network so the rank mask is applied.
+        # Keep the value during backward (gradient checkpointing recompute) and clear it for
+        # non-training forwards (validation/sampling) so they run at full rank.
+        if hasattr(network, "set_current_timestep"):
+            if is_train:
+                network.set_current_timestep(timesteps)
+            elif hasattr(network, "clear_current_timestep"):
+                network.clear_current_timestep()
+
         # Gradient checkpointing support
         if args.gradient_checkpointing:
             noisy_model_input.requires_grad_(True)
