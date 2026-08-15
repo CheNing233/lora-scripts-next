@@ -273,8 +273,17 @@ class AnimaNetworkTrainer(train_network.NetworkTrainer):
         noise = torch.randn_like(latents)
 
         # Get noisy model input and timesteps
+        sigma_min = sigma_max = None
+        if is_train and isinstance(batch, dict):
+            custom_attrs = batch.get("custom_attributes")
+            if custom_attrs:
+                first = custom_attrs[0] if isinstance(custom_attrs, (list, tuple)) else custom_attrs
+                if isinstance(first, dict):
+                    sigma_min = first.get("sigma_min")
+                    sigma_max = first.get("sigma_max")
         noisy_model_input, timesteps, sigmas = flux_train_utils.get_noisy_model_input_and_timesteps(
-            args, noise_scheduler, latents, noise, accelerator.device, weight_dtype
+            args, noise_scheduler, latents, noise, accelerator.device, weight_dtype,
+            sigma_min=sigma_min, sigma_max=sigma_max,
         )
         timesteps = timesteps / 1000.0  # scale to [0, 1] range. timesteps is float32
 

@@ -469,12 +469,23 @@ def compute_loss_weighting_for_sd3(weighting_scheme: str, sigmas=None):
 
 
 def get_noisy_model_input_and_timesteps(
-    args, noise_scheduler, latents: torch.Tensor, noise: torch.Tensor, device, dtype
+    args, noise_scheduler, latents: torch.Tensor, noise: torch.Tensor, device, dtype,
+    sigma_min: Optional[float] = None, sigma_max: Optional[float] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     bsz, h, w = latents.shape[0], latents.shape[-2], latents.shape[-1]
     assert bsz > 0, "Batch size not large enough"
     num_timesteps = noise_scheduler.config.num_train_timesteps
-    if args.timestep_sampling == "uniform" or args.timestep_sampling == "sigmoid":
+    if sigma_min is not None or sigma_max is not None:
+        # Per-subset sigma range (sigma=1 is pure noise, sigma=0 is clean).
+        lo = 0.0 if sigma_min is None else float(sigma_min)
+        hi = 1.0 if sigma_max is None else float(sigma_max)
+        lo = min(max(lo, 0.0), 1.0)
+        hi = min(max(hi, 0.0), 1.0)
+        if hi < lo:
+            lo, hi = hi, lo
+        sigmas = lo + (hi - lo) * torch.rand((bsz,), device=device)
+        timesteps = sigmas * num_timesteps
+    elif args.timestep_sampling == "uniform" or args.timestep_sampling == "sigmoid":
         # Simple random sigma-based noise sampling
         if args.timestep_sampling == "sigmoid":
             # https://github.com/XLabs-AI/x-flux/tree/main

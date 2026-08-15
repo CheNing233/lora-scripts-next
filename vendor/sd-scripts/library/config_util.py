@@ -110,6 +110,8 @@ class BaseDatasetParams:
     validation_split: float = 0.0
     resize_interpolation: Optional[str] = None
     skip_image_resolution: Optional[Tuple[int, int]] = None
+    sigma_min: Optional[float] = None
+    sigma_max: Optional[float] = None
 
 @dataclass
 class DreamBoothDatasetParams(BaseDatasetParams):
@@ -247,6 +249,8 @@ class ConfigSanitizer:
         "network_multiplier": float,
         "resize_interpolation": str,
         "skip_image_resolution": functools.partial(__validate_and_convert_scalar_or_twodim.__func__, int),
+        "sigma_min": Any(float, int),
+        "sigma_max": Any(float, int),
     }
 
     # options handled by argparse but not handled by user config
@@ -494,7 +498,15 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
             dataset_klass = FineTuningDataset
 
         subsets = [subset_klass(**asdict(subset_blueprint.params)) for subset_blueprint in dataset_blueprint.subsets]
-        dataset = dataset_klass(subsets=subsets, **asdict(dataset_blueprint.params), **extra_dataset_params)
+        _dataset_params = asdict(dataset_blueprint.params)
+        _sigma_min = _dataset_params.pop("sigma_min", None)
+        _sigma_max = _dataset_params.pop("sigma_max", None)
+        for _subset in subsets:
+            if _sigma_min is not None:
+                _subset.custom_attributes["sigma_min"] = _sigma_min
+            if _sigma_max is not None:
+                _subset.custom_attributes["sigma_max"] = _sigma_max
+        dataset = dataset_klass(subsets=subsets, **_dataset_params, **extra_dataset_params)
         datasets.append(dataset)
 
     val_datasets: List[Union[DreamBoothDataset, FineTuningDataset, ControlNetDataset]] = []
@@ -521,7 +533,15 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
             dataset_klass = FineTuningDataset
 
         subsets = [subset_klass(**asdict(subset_blueprint.params)) for subset_blueprint in dataset_blueprint.subsets]
-        dataset = dataset_klass(subsets=subsets, **asdict(dataset_blueprint.params), **extra_dataset_params)
+        _dataset_params = asdict(dataset_blueprint.params)
+        _sigma_min = _dataset_params.pop("sigma_min", None)
+        _sigma_max = _dataset_params.pop("sigma_max", None)
+        for _subset in subsets:
+            if _sigma_min is not None:
+                _subset.custom_attributes["sigma_min"] = _sigma_min
+            if _sigma_max is not None:
+                _subset.custom_attributes["sigma_max"] = _sigma_max
+        dataset = dataset_klass(subsets=subsets, **_dataset_params, **extra_dataset_params)
         val_datasets.append(dataset)
 
     def print_info(_datasets, dataset_type: str):
