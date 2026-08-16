@@ -285,8 +285,9 @@ class TLoRANetwork(lora_network.LoRANetwork):
     def set_current_rank_band(self, center, width, schedule=None):
         self.current_rank_center = center
         self.current_rank_width = width
-        if schedule is not None:
-            self.current_rank_schedule = schedule
+        # Always assign so a missing schedule resets to None (module falls back to its
+        # construction-time default) instead of leaking the previous batch's schedule.
+        self.current_rank_schedule = schedule
 
     def clear_current_rank_band(self):
         self.current_rank_center = None
@@ -455,6 +456,8 @@ def create_network_from_weights(multiplier, file, vae, text_encoder, unet, weigh
         tlora_min_rank = int(tlora_min_rank)
     tlora_rank_schedule = _normalize_schedule(kwargs.get("tlora_rank_schedule", "cosine"))
     tlora_orthogonal_init = _parse_bool_arg(kwargs.get("tlora_orthogonal_init", False), default=False)
+    tlora_rank_center = kwargs.get("tlora_rank_center", None)
+    tlora_rank_width = kwargs.get("tlora_rank_width", None)
 
     module_class = TLoRAInfModule if for_inference else None
 
@@ -469,6 +472,8 @@ def create_network_from_weights(multiplier, file, vae, text_encoder, unet, weigh
         tlora_min_rank=tlora_min_rank,
         tlora_rank_schedule=tlora_rank_schedule,
         tlora_orthogonal_init=tlora_orthogonal_init,
+        tlora_rank_center=tlora_rank_center,
+        tlora_rank_width=tlora_rank_width,
     )
 
     block_lr_weight = lora_network.parse_block_lr_kwargs(is_sdxl, kwargs)

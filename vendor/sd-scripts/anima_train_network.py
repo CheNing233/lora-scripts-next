@@ -298,9 +298,10 @@ class AnimaNetworkTrainer(train_network.NetworkTrainer):
             if is_train:
                 network.set_current_timestep(timesteps)
                 if hasattr(network, "set_current_rank_band"):
-                    if rank_center is not None:
+                    rank_spec_present = rank_center is not None or rank_width is not None or rank_schedule is not None
+                    if rank_spec_present:
                         network.set_current_rank_band(
-                            float(rank_center),
+                            float(rank_center) if rank_center is not None else None,
                             float(rank_width) if rank_width is not None else None,
                             schedule=rank_schedule,
                         )

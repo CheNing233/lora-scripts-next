@@ -226,6 +226,8 @@ class NetworkTrainer:
         unwrapped = accelerator.unwrap_model(network)
         if hasattr(unwrapped, "clear_current_timestep"):
             unwrapped.clear_current_timestep()
+        if hasattr(unwrapped, "clear_current_rank_band"):
+            unwrapped.clear_current_rank_band()
 
     # region SD/SDXL
 

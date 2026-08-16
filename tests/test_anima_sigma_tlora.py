@@ -199,6 +199,29 @@ class AnimaSigmaTloraSmokeTests(unittest.TestCase):
         self.assertEqual(active(0.6), 0)  # at cutoff -> zero
         self.assertEqual(active(0.9), 0)  # above cutoff -> zero
 
+    def test_tlora_rank_schedule_fallback_no_stale_leak(self):
+        m = tlora.TLoRAModule(
+            "lora_unet_block_0",
+            torch.nn.Linear(4, 4),
+            lora_dim=8,
+            alpha=8,
+            tlora_rank_schedule="linear",
+        )
+
+        class FakeNet:
+            current_timestep = torch.tensor([0.0])
+            current_rank_center = None
+            current_rank_width = None
+            current_rank_schedule = None
+
+        fake = FakeNet()
+        m.set_network(fake)
+        self.assertEqual(m._get_rank_schedule(), "linear")  # fallback to module default
+        fake.current_rank_schedule = "band"
+        self.assertEqual(m._get_rank_schedule(), "band")  # per-batch override
+        fake.current_rank_schedule = None
+        self.assertEqual(m._get_rank_schedule(), "linear")  # reset -> no stale leak
+
 
 if __name__ == "__main__":
     unittest.main()

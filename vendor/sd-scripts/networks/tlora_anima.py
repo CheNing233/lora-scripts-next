@@ -86,8 +86,9 @@ class TLoRAAnimaNetwork(anima_lora.LoRANetwork):
     def set_current_rank_band(self, center, width, schedule=None):
         self.current_rank_center = center
         self.current_rank_width = width
-        if schedule is not None:
-            self.current_rank_schedule = schedule
+        # Always assign so a missing schedule resets to None (module falls back to its
+        # construction-time default) instead of leaking the previous batch's schedule.
+        self.current_rank_schedule = schedule
 
     def clear_current_rank_band(self):
         self.current_rank_center = None
