@@ -112,6 +112,8 @@ class BaseDatasetParams:
     skip_image_resolution: Optional[Tuple[int, int]] = None
     sigma_min: Optional[float] = None
     sigma_max: Optional[float] = None
+    tlora_rank_center: Optional[float] = None
+    tlora_rank_width: Optional[float] = None
 
 @dataclass
 class DreamBoothDatasetParams(BaseDatasetParams):
@@ -251,6 +253,8 @@ class ConfigSanitizer:
         "skip_image_resolution": functools.partial(__validate_and_convert_scalar_or_twodim.__func__, int),
         "sigma_min": Any(float, int),
         "sigma_max": Any(float, int),
+        "tlora_rank_center": Any(float, int),
+        "tlora_rank_width": Any(float, int),
     }
 
     # options handled by argparse but not handled by user config
@@ -499,14 +503,20 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
 
         subsets = [subset_klass(**asdict(subset_blueprint.params)) for subset_blueprint in dataset_blueprint.subsets]
         _dataset_params = asdict(dataset_blueprint.params)
-        # sigma_min/sigma_max are dataset-level: injected into every subset of this block.
+        # sigma_min/sigma_max & T-LoRA band are dataset-level: injected into every subset of this block.
         _sigma_min = _dataset_params.pop("sigma_min", None)
         _sigma_max = _dataset_params.pop("sigma_max", None)
+        _tlora_rank_center = _dataset_params.pop("tlora_rank_center", None)
+        _tlora_rank_width = _dataset_params.pop("tlora_rank_width", None)
         for _subset in subsets:
             if _sigma_min is not None:
                 _subset.custom_attributes["sigma_min"] = _sigma_min
             if _sigma_max is not None:
                 _subset.custom_attributes["sigma_max"] = _sigma_max
+            if _tlora_rank_center is not None:
+                _subset.custom_attributes["tlora_rank_center"] = _tlora_rank_center
+            if _tlora_rank_width is not None:
+                _subset.custom_attributes["tlora_rank_width"] = _tlora_rank_width
         dataset = dataset_klass(subsets=subsets, **_dataset_params, **extra_dataset_params)
         datasets.append(dataset)
 
@@ -535,14 +545,20 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
 
         subsets = [subset_klass(**asdict(subset_blueprint.params)) for subset_blueprint in dataset_blueprint.subsets]
         _dataset_params = asdict(dataset_blueprint.params)
-        # sigma_min/sigma_max are dataset-level: injected into every subset of this block.
+        # sigma_min/sigma_max & T-LoRA band are dataset-level: injected into every subset of this block.
         _sigma_min = _dataset_params.pop("sigma_min", None)
         _sigma_max = _dataset_params.pop("sigma_max", None)
+        _tlora_rank_center = _dataset_params.pop("tlora_rank_center", None)
+        _tlora_rank_width = _dataset_params.pop("tlora_rank_width", None)
         for _subset in subsets:
             if _sigma_min is not None:
                 _subset.custom_attributes["sigma_min"] = _sigma_min
             if _sigma_max is not None:
                 _subset.custom_attributes["sigma_max"] = _sigma_max
+            if _tlora_rank_center is not None:
+                _subset.custom_attributes["tlora_rank_center"] = _tlora_rank_center
+            if _tlora_rank_width is not None:
+                _subset.custom_attributes["tlora_rank_width"] = _tlora_rank_width
         dataset = dataset_klass(subsets=subsets, **_dataset_params, **extra_dataset_params)
         val_datasets.append(dataset)
 

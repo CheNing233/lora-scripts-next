@@ -42,15 +42,21 @@ class TLoRAAnimaNetwork(anima_lora.LoRANetwork):
         tlora_min_rank: Optional[int] = None,
         tlora_rank_schedule: Optional[str] = None,
         tlora_orthogonal_init: bool = False,
+        tlora_rank_center: Optional[float] = None,
+        tlora_rank_width: Optional[float] = None,
         train_norm: bool = False,
         module_class=None,
         **kwargs,
     ):
         self.current_timestep = None
+        self.current_rank_center = None
+        self.current_rank_width = None
         self.train_norm = train_norm
         self.tlora_min_rank = int(tlora_min_rank if tlora_min_rank is not None else 1)
         self.tlora_rank_schedule = _normalize_schedule(tlora_rank_schedule)
         self.tlora_orthogonal_init = _parse_bool_arg(tlora_orthogonal_init, default=False)
+        self.tlora_rank_center = float(tlora_rank_center) if tlora_rank_center is not None else None
+        self.tlora_rank_width = float(tlora_rank_width) if tlora_rank_width is not None else None
 
         if module_class is None:
             module_class = partial(
@@ -58,6 +64,8 @@ class TLoRAAnimaNetwork(anima_lora.LoRANetwork):
                 tlora_min_rank=self.tlora_min_rank,
                 tlora_rank_schedule=self.tlora_rank_schedule,
                 tlora_orthogonal_init=self.tlora_orthogonal_init,
+                tlora_rank_center=self.tlora_rank_center,
+                tlora_rank_width=self.tlora_rank_width,
             )
 
         super().__init__(text_encoders, unet, *args, module_class=module_class, **kwargs)
@@ -73,6 +81,14 @@ class TLoRAAnimaNetwork(anima_lora.LoRANetwork):
 
     def clear_current_timestep(self):
         self.current_timestep = None
+
+    def set_current_rank_band(self, center, width):
+        self.current_rank_center = center
+        self.current_rank_width = width
+
+    def clear_current_rank_band(self):
+        self.current_rank_center = None
+        self.current_rank_width = None
 
     def apply_to(self, text_encoders, unet, apply_text_encoder=True, apply_unet=True):
         if apply_text_encoder:
@@ -150,6 +166,8 @@ def create_network(
         tlora_min_rank = int(tlora_min_rank)
     tlora_rank_schedule = _normalize_schedule(kwargs.get("tlora_rank_schedule", "cosine"))
     tlora_orthogonal_init = _parse_bool_arg(kwargs.get("tlora_orthogonal_init", False), default=False)
+    tlora_rank_center = kwargs.get("tlora_rank_center", None)
+    tlora_rank_width = kwargs.get("tlora_rank_width", None)
 
     verbose = _parse_string_bool(kwargs.get("verbose", "false"), default=False)
 
@@ -196,6 +214,8 @@ def create_network(
         tlora_min_rank=tlora_min_rank,
         tlora_rank_schedule=tlora_rank_schedule,
         tlora_orthogonal_init=tlora_orthogonal_init,
+        tlora_rank_center=tlora_rank_center,
+        tlora_rank_width=tlora_rank_width,
     )
 
     loraplus_lr_ratio = kwargs.get("loraplus_lr_ratio", None)
@@ -250,6 +270,8 @@ def create_network_from_weights(multiplier, file, ae, text_encoders, unet, weigh
         tlora_min_rank = int(tlora_min_rank)
     tlora_rank_schedule = _normalize_schedule(kwargs.get("tlora_rank_schedule", "cosine"))
     tlora_orthogonal_init = _parse_bool_arg(kwargs.get("tlora_orthogonal_init", False), default=False)
+    tlora_rank_center = kwargs.get("tlora_rank_center", None)
+    tlora_rank_width = kwargs.get("tlora_rank_width", None)
 
     module_class = TLoRAInfModule if for_inference else None
 
@@ -265,5 +287,7 @@ def create_network_from_weights(multiplier, file, ae, text_encoders, unet, weigh
         tlora_min_rank=tlora_min_rank,
         tlora_rank_schedule=tlora_rank_schedule,
         tlora_orthogonal_init=tlora_orthogonal_init,
+        tlora_rank_center=tlora_rank_center,
+        tlora_rank_width=tlora_rank_width,
     )
     return network, weights_sd

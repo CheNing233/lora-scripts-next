@@ -37,7 +37,7 @@ def _parse_bool_arg(value, default: bool = False) -> bool:
 
 def _normalize_schedule(value) -> str:
     schedule = str(value or "cosine").strip().lower() or "cosine"
-    if schedule not in {"linear", "cosine"}:
+    if schedule not in {"linear", "cosine", "band"}:
         return "cosine"
     return schedule
 
@@ -86,6 +86,8 @@ class TLoRAModule(lora_network.LoRAModule):
         tlora_min_rank: Optional[int] = None,
         tlora_rank_schedule: Optional[str] = None,
         tlora_orthogonal_init: bool = False,
+        tlora_rank_center: Optional[float] = None,
+        tlora_rank_width: Optional[float] = None,
     ):
         super().__init__(
             lora_name,
@@ -101,6 +103,8 @@ class TLoRAModule(lora_network.LoRAModule):
         self.tlora_min_rank = max(1, min(self.lora_dim, int(tlora_min_rank if tlora_min_rank is not None else 1)))
         self.tlora_rank_schedule = _normalize_schedule(tlora_rank_schedule)
         self.tlora_orthogonal_init = _parse_bool_arg(tlora_orthogonal_init, default=False)
+        self.tlora_rank_center = float(tlora_rank_center) if tlora_rank_center is not None else None
+        self.tlora_rank_width = float(tlora_rank_width) if tlora_rank_width is not None else None
 
         if self.tlora_orthogonal_init:
             torch.nn.init.orthogonal_(self.lora_down.weight)
@@ -125,9 +129,25 @@ class TLoRAModule(lora_network.LoRAModule):
             return None
         return timesteps
 
+    def _get_rank_center(self):
+        network = self._get_network()
+        if network is not None:
+            v = getattr(network, "current_rank_center", None)
+            if v is not None:
+                return float(v)
+        return self.tlora_rank_center
+
+    def _get_rank_width(self):
+        network = self._get_network()
+        if network is not None:
+            v = getattr(network, "current_rank_width", None)
+            if v is not None:
+                return float(v)
+        return self.tlora_rank_width
+
     def _get_tlora_rank_mask_and_scale(self, lx):
         timesteps = self._get_current_timesteps()
-        if timesteps is None or self.lora_dim <= self.tlora_min_rank:
+        if timesteps is None:
             return None, None
 
         batch_size = lx.size(0)
@@ -141,19 +161,31 @@ class TLoRAModule(lora_network.LoRAModule):
         # without .item() (which would force a GPU sync on every LoRA module forward).
         timesteps = timesteps.clamp(0.0, 1.0)
 
-        progress = 1.0 - timesteps
-        if self.tlora_rank_schedule == "cosine":
-            progress = 0.5 - 0.5 * torch.cos(progress * math.pi)
-
-        active_rank = self.tlora_min_rank + torch.round((self.lora_dim - self.tlora_min_rank) * progress).to(torch.int64)
-        active_rank = active_rank.clamp(min=self.tlora_min_rank, max=self.lora_dim)
+        if self.tlora_rank_schedule == "band":
+            # Band-pass rank: rank peaks at tlora_rank_center and drops to 0 on both
+            # sides (triangular). No rank/scale compensation so influence ramps with rank.
+            center = self._get_rank_center()
+            width = self._get_rank_width()
+            if center is None or width is None or width <= 0:
+                return None, None
+            dist = (timesteps - center).abs()
+            rank_frac = (1.0 - dist / width).clamp(0.0, 1.0)
+            active_rank = torch.round(rank_frac * self.lora_dim).to(torch.int64).clamp(0, self.lora_dim)
+            rank_scale = None
+        else:
+            if self.lora_dim <= self.tlora_min_rank:
+                return None, None
+            progress = 1.0 - timesteps
+            if self.tlora_rank_schedule == "cosine":
+                progress = 0.5 - 0.5 * torch.cos(progress * math.pi)
+            active_rank = self.tlora_min_rank + torch.round((self.lora_dim - self.tlora_min_rank) * progress).to(torch.int64)
+            active_rank = active_rank.clamp(min=self.tlora_min_rank, max=self.lora_dim)
+            rank_scale = (self.lora_dim / active_rank.clamp(min=1)).to(dtype=lx.dtype)
+            rank_scale = _broadcast_per_sample_scale(rank_scale, lx)
 
         rank_index = torch.arange(self.lora_dim, device=lx.device).unsqueeze(0)
         rank_mask = (rank_index < active_rank.unsqueeze(1)).to(dtype=lx.dtype)
         rank_mask = _broadcast_rank_mask(rank_mask, lx)
-
-        rank_scale = (self.lora_dim / active_rank.clamp(min=1)).to(dtype=lx.dtype)
-        rank_scale = _broadcast_per_sample_scale(rank_scale, lx)
         return rank_mask, rank_scale
 
     def forward(self, x):
@@ -199,13 +231,19 @@ class TLoRANetwork(lora_network.LoRANetwork):
         tlora_min_rank: Optional[int] = None,
         tlora_rank_schedule: Optional[str] = None,
         tlora_orthogonal_init: bool = False,
+        tlora_rank_center: Optional[float] = None,
+        tlora_rank_width: Optional[float] = None,
         module_class=None,
         **kwargs,
     ):
         self.current_timestep = None
+        self.current_rank_center = None
+        self.current_rank_width = None
         self.tlora_min_rank = int(tlora_min_rank if tlora_min_rank is not None else 1)
         self.tlora_rank_schedule = _normalize_schedule(tlora_rank_schedule)
         self.tlora_orthogonal_init = _parse_bool_arg(tlora_orthogonal_init, default=False)
+        self.tlora_rank_center = float(tlora_rank_center) if tlora_rank_center is not None else None
+        self.tlora_rank_width = float(tlora_rank_width) if tlora_rank_width is not None else None
 
         if module_class is None:
             module_class = partial(
@@ -213,6 +251,8 @@ class TLoRANetwork(lora_network.LoRANetwork):
                 tlora_min_rank=self.tlora_min_rank,
                 tlora_rank_schedule=self.tlora_rank_schedule,
                 tlora_orthogonal_init=self.tlora_orthogonal_init,
+                tlora_rank_center=self.tlora_rank_center,
+                tlora_rank_width=self.tlora_rank_width,
             )
 
         super().__init__(text_encoder, unet, *args, module_class=module_class, **kwargs)
@@ -222,6 +262,14 @@ class TLoRANetwork(lora_network.LoRANetwork):
 
     def clear_current_timestep(self):
         self.current_timestep = None
+
+    def set_current_rank_band(self, center, width):
+        self.current_rank_center = center
+        self.current_rank_width = width
+
+    def clear_current_rank_band(self):
+        self.current_rank_center = None
+        self.current_rank_width = None
 
     def apply_to(self, text_encoder, unet, apply_text_encoder=True, apply_unet=True):
         if apply_text_encoder:
@@ -307,6 +355,8 @@ def create_network(
         tlora_min_rank = int(tlora_min_rank)
     tlora_rank_schedule = _normalize_schedule(kwargs.get("tlora_rank_schedule", "cosine"))
     tlora_orthogonal_init = _parse_bool_arg(kwargs.get("tlora_orthogonal_init", False), default=False)
+    tlora_rank_center = kwargs.get("tlora_rank_center", None)
+    tlora_rank_width = kwargs.get("tlora_rank_width", None)
 
     network = TLoRANetwork(
         text_encoder,
@@ -328,6 +378,8 @@ def create_network(
         tlora_min_rank=tlora_min_rank,
         tlora_rank_schedule=tlora_rank_schedule,
         tlora_orthogonal_init=tlora_orthogonal_init,
+        tlora_rank_center=tlora_rank_center,
+        tlora_rank_width=tlora_rank_width,
     )
 
     loraplus_lr_ratio = kwargs.get("loraplus_lr_ratio", None)

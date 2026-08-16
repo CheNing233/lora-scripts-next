@@ -121,6 +121,45 @@ class AnimaSigmaTloraSmokeTests(unittest.TestCase):
         self.assertIsNone(mask)
         self.assertIsNone(scale)
 
+    def test_tlora_band_schedule_peaks_and_drops_to_zero(self):
+        m = tlora.TLoRAModule(
+            "lora_unet_block_0",
+            torch.nn.Linear(4, 4),
+            lora_dim=8,
+            alpha=8,
+            tlora_rank_schedule="band",
+        )
+
+        class FakeNet:
+            current_timestep = None
+            current_rank_center = None
+            current_rank_width = None
+
+        fake = FakeNet()
+        m.set_network(fake)
+        fake.current_rank_center = 0.5
+        fake.current_rank_width = 0.2
+        lx = torch.randn(1, 8)
+
+        # no timestep -> no mask
+        fake.current_timestep = None
+        mask, scale = m._get_tlora_rank_mask_and_scale(lx)
+        self.assertIsNone(mask)
+
+        def active(t):
+            fake.current_timestep = torch.tensor([t])
+            mask, scale = m._get_tlora_rank_mask_and_scale(lx)
+            self.assertIsNotNone(mask)
+            self.assertIsNone(scale)  # band schedule does not compensate rank/scale
+            return int(mask.sum())
+
+        self.assertEqual(active(0.5), 8)  # at center -> full rank
+        self.assertEqual(active(0.4), 4)  # half-width -> half rank
+        self.assertEqual(active(0.3), 0)  # at left edge -> zero
+        self.assertEqual(active(0.7), 0)  # at right edge -> zero
+        self.assertEqual(active(1.0), 0)  # far right -> zero
+        self.assertEqual(active(0.0), 0)  # far left -> zero
+
 
 if __name__ == "__main__":
     unittest.main()
