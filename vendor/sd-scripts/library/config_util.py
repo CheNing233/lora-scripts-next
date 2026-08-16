@@ -114,6 +114,7 @@ class BaseDatasetParams:
     sigma_max: Optional[float] = None
     tlora_rank_center: Optional[float] = None
     tlora_rank_width: Optional[float] = None
+    tlora_rank_schedule: Optional[str] = None
 
 @dataclass
 class DreamBoothDatasetParams(BaseDatasetParams):
@@ -255,6 +256,7 @@ class ConfigSanitizer:
         "sigma_max": Any(float, int),
         "tlora_rank_center": Any(float, int),
         "tlora_rank_width": Any(float, int),
+        "tlora_rank_schedule": str,
     }
 
     # options handled by argparse but not handled by user config
@@ -508,6 +510,7 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
         _sigma_max = _dataset_params.pop("sigma_max", None)
         _tlora_rank_center = _dataset_params.pop("tlora_rank_center", None)
         _tlora_rank_width = _dataset_params.pop("tlora_rank_width", None)
+        _tlora_rank_schedule = _dataset_params.pop("tlora_rank_schedule", None)
         for _subset in subsets:
             if _sigma_min is not None:
                 _subset.custom_attributes["sigma_min"] = _sigma_min
@@ -517,6 +520,8 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
                 _subset.custom_attributes["tlora_rank_center"] = _tlora_rank_center
             if _tlora_rank_width is not None:
                 _subset.custom_attributes["tlora_rank_width"] = _tlora_rank_width
+            if _tlora_rank_schedule is not None:
+                _subset.custom_attributes["tlora_rank_schedule"] = _tlora_rank_schedule
         dataset = dataset_klass(subsets=subsets, **_dataset_params, **extra_dataset_params)
         datasets.append(dataset)
 
@@ -550,6 +555,7 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
         _sigma_max = _dataset_params.pop("sigma_max", None)
         _tlora_rank_center = _dataset_params.pop("tlora_rank_center", None)
         _tlora_rank_width = _dataset_params.pop("tlora_rank_width", None)
+        _tlora_rank_schedule = _dataset_params.pop("tlora_rank_schedule", None)
         for _subset in subsets:
             if _sigma_min is not None:
                 _subset.custom_attributes["sigma_min"] = _sigma_min
@@ -559,6 +565,8 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
                 _subset.custom_attributes["tlora_rank_center"] = _tlora_rank_center
             if _tlora_rank_width is not None:
                 _subset.custom_attributes["tlora_rank_width"] = _tlora_rank_width
+            if _tlora_rank_schedule is not None:
+                _subset.custom_attributes["tlora_rank_schedule"] = _tlora_rank_schedule
         dataset = dataset_klass(subsets=subsets, **_dataset_params, **extra_dataset_params)
         val_datasets.append(dataset)
 

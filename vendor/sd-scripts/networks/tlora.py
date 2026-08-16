@@ -37,7 +37,7 @@ def _parse_bool_arg(value, default: bool = False) -> bool:
 
 def _normalize_schedule(value) -> str:
     schedule = str(value or "cosine").strip().lower() or "cosine"
-    if schedule not in {"linear", "cosine", "band"}:
+    if schedule not in {"linear", "cosine", "band", "lowpass"}:
         return "cosine"
     return schedule
 
@@ -145,6 +145,14 @@ class TLoRAModule(lora_network.LoRAModule):
                 return float(v)
         return self.tlora_rank_width
 
+    def _get_rank_schedule(self):
+        network = self._get_network()
+        if network is not None:
+            v = getattr(network, "current_rank_schedule", None)
+            if v is not None:
+                return _normalize_schedule(v)
+        return self.tlora_rank_schedule
+
     def _get_tlora_rank_mask_and_scale(self, lx):
         timesteps = self._get_current_timesteps()
         if timesteps is None:
@@ -161,7 +169,8 @@ class TLoRAModule(lora_network.LoRAModule):
         # without .item() (which would force a GPU sync on every LoRA module forward).
         timesteps = timesteps.clamp(0.0, 1.0)
 
-        if self.tlora_rank_schedule == "band":
+        schedule = self._get_rank_schedule()
+        if schedule == "band":
             # Band-pass rank: rank peaks at tlora_rank_center and drops to 0 on both
             # sides (triangular). No rank/scale compensation so influence ramps with rank.
             center = self._get_rank_center()
@@ -172,11 +181,20 @@ class TLoRAModule(lora_network.LoRAModule):
             rank_frac = (1.0 - dist / width).clamp(0.0, 1.0)
             active_rank = torch.round(rank_frac * self.lora_dim).to(torch.int64).clamp(0, self.lora_dim)
             rank_scale = None
+        elif schedule == "lowpass":
+            # Low-pass rank: rank is max at t=0 (clean) and ramps down to 0 at t=cutoff.
+            # tlora_rank_center is reused as the cutoff sigma (rank -> 0 for t >= cutoff).
+            cutoff = self._get_rank_center()
+            if cutoff is None or cutoff <= 0:
+                return None, None
+            rank_frac = (1.0 - timesteps / cutoff).clamp(0.0, 1.0)
+            active_rank = torch.round(rank_frac * self.lora_dim).to(torch.int64).clamp(0, self.lora_dim)
+            rank_scale = None
         else:
             if self.lora_dim <= self.tlora_min_rank:
                 return None, None
             progress = 1.0 - timesteps
-            if self.tlora_rank_schedule == "cosine":
+            if schedule == "cosine":
                 progress = 0.5 - 0.5 * torch.cos(progress * math.pi)
             active_rank = self.tlora_min_rank + torch.round((self.lora_dim - self.tlora_min_rank) * progress).to(torch.int64)
             active_rank = active_rank.clamp(min=self.tlora_min_rank, max=self.lora_dim)
@@ -239,6 +257,7 @@ class TLoRANetwork(lora_network.LoRANetwork):
         self.current_timestep = None
         self.current_rank_center = None
         self.current_rank_width = None
+        self.current_rank_schedule = None
         self.tlora_min_rank = int(tlora_min_rank if tlora_min_rank is not None else 1)
         self.tlora_rank_schedule = _normalize_schedule(tlora_rank_schedule)
         self.tlora_orthogonal_init = _parse_bool_arg(tlora_orthogonal_init, default=False)
@@ -263,13 +282,16 @@ class TLoRANetwork(lora_network.LoRANetwork):
     def clear_current_timestep(self):
         self.current_timestep = None
 
-    def set_current_rank_band(self, center, width):
+    def set_current_rank_band(self, center, width, schedule=None):
         self.current_rank_center = center
         self.current_rank_width = width
+        if schedule is not None:
+            self.current_rank_schedule = schedule
 
     def clear_current_rank_band(self):
         self.current_rank_center = None
         self.current_rank_width = None
+        self.current_rank_schedule = None
 
     def apply_to(self, text_encoder, unet, apply_text_encoder=True, apply_unet=True):
         if apply_text_encoder:

@@ -51,6 +51,7 @@ class TLoRAAnimaNetwork(anima_lora.LoRANetwork):
         self.current_timestep = None
         self.current_rank_center = None
         self.current_rank_width = None
+        self.current_rank_schedule = None
         self.train_norm = train_norm
         self.tlora_min_rank = int(tlora_min_rank if tlora_min_rank is not None else 1)
         self.tlora_rank_schedule = _normalize_schedule(tlora_rank_schedule)
@@ -82,13 +83,16 @@ class TLoRAAnimaNetwork(anima_lora.LoRANetwork):
     def clear_current_timestep(self):
         self.current_timestep = None
 
-    def set_current_rank_band(self, center, width):
+    def set_current_rank_band(self, center, width, schedule=None):
         self.current_rank_center = center
         self.current_rank_width = width
+        if schedule is not None:
+            self.current_rank_schedule = schedule
 
     def clear_current_rank_band(self):
         self.current_rank_center = None
         self.current_rank_width = None
+        self.current_rank_schedule = None
 
     def apply_to(self, text_encoders, unet, apply_text_encoder=True, apply_unet=True):
         if apply_text_encoder:

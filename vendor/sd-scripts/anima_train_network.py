@@ -274,7 +274,7 @@ class AnimaNetworkTrainer(train_network.NetworkTrainer):
 
         # Get noisy model input and timesteps
         sigma_min = sigma_max = None
-        rank_center = rank_width = None
+        rank_center = rank_width = rank_schedule = None
         if is_train and isinstance(batch, dict):
             custom_attrs = batch.get("custom_attributes")
             if custom_attrs:
@@ -284,6 +284,7 @@ class AnimaNetworkTrainer(train_network.NetworkTrainer):
                     sigma_max = first.get("sigma_max")
                     rank_center = first.get("tlora_rank_center")
                     rank_width = first.get("tlora_rank_width")
+                    rank_schedule = first.get("tlora_rank_schedule")
         noisy_model_input, timesteps, sigmas = flux_train_utils.get_noisy_model_input_and_timesteps(
             args, noise_scheduler, latents, noise, accelerator.device, weight_dtype,
             sigma_min=sigma_min, sigma_max=sigma_max,
@@ -297,8 +298,12 @@ class AnimaNetworkTrainer(train_network.NetworkTrainer):
             if is_train:
                 network.set_current_timestep(timesteps)
                 if hasattr(network, "set_current_rank_band"):
-                    if rank_center is not None and rank_width is not None:
-                        network.set_current_rank_band(float(rank_center), float(rank_width))
+                    if rank_center is not None:
+                        network.set_current_rank_band(
+                            float(rank_center),
+                            float(rank_width) if rank_width is not None else None,
+                            schedule=rank_schedule,
+                        )
                     elif hasattr(network, "clear_current_rank_band"):
                         network.clear_current_rank_band()
             else:

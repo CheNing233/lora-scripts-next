@@ -74,6 +74,9 @@ class AnimaSigmaTloraSmokeTests(unittest.TestCase):
                     enable_bucket=False,
                     sigma_min=0.35,
                     sigma_max=0.75,
+                    tlora_rank_center=0.6,
+                    tlora_rank_width=0.2,
+                    tlora_rank_schedule="band",
                 ),
                 subsets=[sub],
             )
@@ -84,6 +87,9 @@ class AnimaSigmaTloraSmokeTests(unittest.TestCase):
             subset0 = train_group.datasets[0].subsets[0]
             self.assertEqual(subset0.custom_attributes.get("sigma_min"), 0.35)
             self.assertEqual(subset0.custom_attributes.get("sigma_max"), 0.75)
+            self.assertEqual(subset0.custom_attributes.get("tlora_rank_center"), 0.6)
+            self.assertEqual(subset0.custom_attributes.get("tlora_rank_width"), 0.2)
+            self.assertEqual(subset0.custom_attributes.get("tlora_rank_schedule"), "band")
 
     def test_tlora_rank_mask_activates_and_clears(self):
         m = tlora.TLoRAModule(
@@ -159,6 +165,39 @@ class AnimaSigmaTloraSmokeTests(unittest.TestCase):
         self.assertEqual(active(0.7), 0)  # at right edge -> zero
         self.assertEqual(active(1.0), 0)  # far right -> zero
         self.assertEqual(active(0.0), 0)  # far left -> zero
+
+    def test_tlora_lowpass_schedule_ramps_to_tail(self):
+        m = tlora.TLoRAModule(
+            "lora_unet_block_0",
+            torch.nn.Linear(4, 4),
+            lora_dim=8,
+            alpha=8,
+            tlora_rank_schedule="lowpass",
+        )
+
+        class FakeNet:
+            current_timestep = None
+            current_rank_center = None
+            current_rank_width = None
+            current_rank_schedule = None
+
+        fake = FakeNet()
+        m.set_network(fake)
+        fake.current_rank_center = 0.6  # cutoff
+        fake.current_rank_schedule = "lowpass"
+        lx = torch.randn(1, 8)
+
+        def active(t):
+            fake.current_timestep = torch.tensor([t])
+            mask, scale = m._get_tlora_rank_mask_and_scale(lx)
+            self.assertIsNotNone(mask)
+            self.assertIsNone(scale)  # lowpass does not compensate rank/scale
+            return int(mask.sum())
+
+        self.assertEqual(active(0.0), 8)  # t=0 (tail) -> max rank
+        self.assertEqual(active(0.3), 4)  # half cutoff -> half rank
+        self.assertEqual(active(0.6), 0)  # at cutoff -> zero
+        self.assertEqual(active(0.9), 0)  # above cutoff -> zero
 
 
 if __name__ == "__main__":
