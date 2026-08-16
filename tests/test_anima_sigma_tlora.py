@@ -222,6 +222,27 @@ class AnimaSigmaTloraSmokeTests(unittest.TestCase):
         fake.current_rank_schedule = None
         self.assertEqual(m._get_rank_schedule(), "linear")  # reset -> no stale leak
 
+    def test_tlora_rank_schedule_invalid_override_falls_back(self):
+        m = tlora.TLoRAModule(
+            "lora_unet_block_0",
+            torch.nn.Linear(4, 4),
+            lora_dim=8,
+            alpha=8,
+            tlora_rank_schedule="band",
+        )
+
+        class FakeNet:
+            current_timestep = torch.tensor([0.0])
+            current_rank_center = None
+            current_rank_width = None
+            current_rank_schedule = None
+
+        fake = FakeNet()
+        m.set_network(fake)
+        self.assertEqual(m._get_rank_schedule(), "band")
+        fake.current_rank_schedule = "bogus"
+        self.assertEqual(m._get_rank_schedule(), "band")  # invalid override -> fallback, not cosine
+
 
 if __name__ == "__main__":
     unittest.main()

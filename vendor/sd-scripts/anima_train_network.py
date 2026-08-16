@@ -294,24 +294,27 @@ class AnimaNetworkTrainer(train_network.NetworkTrainer):
         # T-LoRA: propagate the current timestep into the network so the rank mask is applied.
         # Keep the value during backward (gradient checkpointing recompute) and clear it for
         # non-training forwards (validation/sampling) so they run at full rank.
-        if hasattr(network, "set_current_timestep"):
+        # Unwrap first: accelerate may wrap the network (DDP/DeepSpeed) and the TLoRAModules
+        # hold weakrefs to the UNWRAPPED network.
+        tlora_network = accelerator.unwrap_model(network)
+        if hasattr(tlora_network, "set_current_timestep"):
             if is_train:
-                network.set_current_timestep(timesteps)
-                if hasattr(network, "set_current_rank_band"):
+                tlora_network.set_current_timestep(timesteps)
+                if hasattr(tlora_network, "set_current_rank_band"):
                     rank_spec_present = rank_center is not None or rank_width is not None or rank_schedule is not None
                     if rank_spec_present:
-                        network.set_current_rank_band(
+                        tlora_network.set_current_rank_band(
                             float(rank_center) if rank_center is not None else None,
                             float(rank_width) if rank_width is not None else None,
                             schedule=rank_schedule,
                         )
-                    elif hasattr(network, "clear_current_rank_band"):
-                        network.clear_current_rank_band()
+                    elif hasattr(tlora_network, "clear_current_rank_band"):
+                        tlora_network.clear_current_rank_band()
             else:
-                if hasattr(network, "clear_current_timestep"):
-                    network.clear_current_timestep()
-                if hasattr(network, "clear_current_rank_band"):
-                    network.clear_current_rank_band()
+                if hasattr(tlora_network, "clear_current_timestep"):
+                    tlora_network.clear_current_timestep()
+                if hasattr(tlora_network, "clear_current_rank_band"):
+                    tlora_network.clear_current_rank_band()
 
         # Gradient checkpointing support
         if args.gradient_checkpointing:

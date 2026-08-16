@@ -150,7 +150,10 @@ class TLoRAModule(lora_network.LoRAModule):
         if network is not None:
             v = getattr(network, "current_rank_schedule", None)
             if v is not None:
-                return _normalize_schedule(v)
+                sched = str(v).strip().lower()
+                if sched in {"linear", "cosine", "band", "lowpass"}:
+                    return sched
+                logger.warning(f"invalid tlora_rank_schedule override '{v}', falling back to '{self.tlora_rank_schedule}'")
         return self.tlora_rank_schedule
 
     def _get_tlora_rank_mask_and_scale(self, lx):

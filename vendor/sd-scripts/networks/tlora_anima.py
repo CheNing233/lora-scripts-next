@@ -255,9 +255,6 @@ def create_network_from_weights(multiplier, file, ae, text_encoders, unet, weigh
             continue
 
         lora_name = key.split(".")[0]
-        if lora_name.startswith(anima_lora.TRAIN_NORM_PREFIX_ANIMA) or lora_name.startswith(anima_lora.TRAIN_NORM_PREFIX_TEXT_ENCODER):
-            train_norm = True
-            continue
         if "alpha" in key:
             modules_alpha[lora_name] = value
         elif "lora_down" in key:
